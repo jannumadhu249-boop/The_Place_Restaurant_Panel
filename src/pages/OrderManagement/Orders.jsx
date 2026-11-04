@@ -1,412 +1,605 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ShoppingCart,
-  Check,
-  X,
-  Clock,
-  ChefHat,
-  Bike,
   Eye,
   Search,
-  Filter,
-  DollarSign,
   Printer,
-  Phone,
-  MapPin,
-  Calendar,
-  AlertCircle
+  X,
+  Check,
+  ChefHat,
+  Bike,
+  Clock,
+  RefreshCw,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
+import { URLS } from '../../url';
+import ViewOrder from './ViewOrder';
+import './Orders.css';
 
 export default function Orders() {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('All');
+
+  // Detail Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
+  const [updatingId, setUpdatingId] = useState(null);
 
-  const [orders, setOrders] = useState([
-    {
-      id: '#ORD-8924',
-      customer: 'Sophie Taylor',
-      phone: '+1 555-1234',
-      address: 'Apt 4B, Hillcrest Manor, Downtown',
-      items: [
-        { name: 'Butter Chicken Special', qty: 2, price: 16.99 },
-        { name: 'Garlic Butter Naan', qty: 4, price: 3.50 },
-        { name: 'Mango Lassi Chilled', qty: 2, price: 4.99 },
-      ],
-      total: '$57.96',
-      payment: 'Paid (Credit Card)',
-      type: 'Delivery',
-      status: 'Preparing',
-      time: '6 mins ago',
-      notes: 'Extra spicy butter chicken please, and leave at door.'
-    },
-    {
-      id: '#ORD-8923',
-      customer: 'Rahul Sharma',
-      phone: '+1 555-5678',
-      address: '74 Elm Street, City Center',
-      items: [
-        { name: 'Paneer Tikka Masala', qty: 1, price: 14.50 },
-        { name: 'Tandoori Roti', qty: 2, price: 2.50 },
-      ],
-      total: '$19.50',
-      payment: 'Cash on Delivery',
-      type: 'Takeaway',
-      status: 'Preparing',
-      time: '14 mins ago',
-      notes: 'Customer will pick up in 10 mins.'
-    },
-    {
-      id: '#ORD-8922',
-      customer: 'David Miller',
-      phone: '+1 555-9012',
-      address: '12 Oxford Road, Suite 300',
-      items: [
-        { name: 'Chicken Biryani Feast Box', qty: 1, price: 18.50 },
-        { name: 'Gulab Jamun (2 pcs)', qty: 1, price: 5.50 },
-      ],
-      total: '$24.00',
-      payment: 'Paid (Apple Pay)',
-      type: 'Delivery',
-      status: 'Ready',
-      time: '22 mins ago',
-      notes: 'Please ensure rider has hot-bag.'
-    },
-    {
-      id: '#ORD-8921',
-      customer: 'Emma Watson',
-      phone: '+1 555-3456',
-      address: '88 Sunset Blvd, Building 2',
-      items: [
-        { name: 'Crispy Veg Spring Rolls', qty: 2, price: 7.99 },
-        { name: 'Garlic Naan', qty: 2, price: 3.50 },
-      ],
-      total: '$22.98',
-      payment: 'Paid (Stripe)',
-      type: 'Delivery',
-      status: 'Pending',
-      time: '2 mins ago',
-      notes: 'Include extra green chutney.'
-    },
-    {
-      id: '#ORD-8920',
-      customer: 'Alex Rivera',
-      phone: '+1 555-7788',
-      address: 'Table #4 (In-Store Dine-In)',
-      items: [
-        { name: 'Tandoori Mixed Grill Platter', qty: 1, price: 28.00 },
-        { name: 'Fresh Mint Lime Soda', qty: 2, price: 4.00 },
-      ],
-      total: '$36.00',
-      payment: 'Paid (Table QR)',
-      type: 'Dine-In',
-      status: 'Delivered',
-      time: '45 mins ago',
-      notes: 'Table 4 requested quick serving.'
-    }
-  ]);
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(URLS.GetOrders, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const result = await response.json();
 
-  const updateStatus = (id, newStatus) => {
-    setOrders(orders.map(o => o.id === id ? { ...o, status: newStatus } : o));
-    if (selectedOrder && selectedOrder.id === id) {
-      setSelectedOrder(prev => ({ ...prev, status: newStatus }));
+      if (response.ok && result) {
+        const list = result.data || result.bookings || result.orders || (Array.isArray(result) ? result : []);
+        setOrders(Array.isArray(list) ? list : []);
+      } else {
+        setError(result?.message || 'Failed to load bookings.');
+      }
+    } catch (err) {
+      console.error('Fetch orders error:', err);
+      setError('Unable to connect to the server.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const statuses = ['All', 'Pending', 'Preparing', 'Ready', 'Delivered'];
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const handleViewOrder = async (order) => {
+    const mongoId = order._id || order.id || order.bookingId;
+    setSelectedOrder(order);
+    setDetailError('');
+
+    try {
+      const token = localStorage.getItem('token');
+      const getByIdUrl = `${URLS.GetOrderById.endsWith('/') ? URLS.GetOrderById : `${URLS.GetOrderById}/`}${mongoId}`;
+      const response = await fetch(getByIdUrl, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
+      });
+      const result = await response.json();
+      if (response.ok && result) {
+        const fullData = result.data || result.booking || result.order || result;
+        setSelectedOrder(fullData);
+      }
+    } catch (err) {
+      console.error('Fetch order detail error:', err);
+    }
+  };
+
+  const handleUpdateStatus = async (orderId, newStatus) => {
+    if (!orderId) return;
+    setUpdatingId(orderId);
+
+    // Optimistic update
+    setOrders(prev => {
+      const updated = prev.map(o => {
+        const id = o._id || o.id || o.bookingId;
+        if (id === orderId) return { ...o, bookingStatus: newStatus };
+        return o;
+      });
+      return updated;
+    });
+
+    if (selectedOrder && (selectedOrder._id === orderId || selectedOrder.id === orderId || selectedOrder.bookingId === orderId)) {
+      setSelectedOrder(prev => ({ ...prev, bookingStatus: newStatus }));
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(URLS.UpdateBookingStatus, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) },
+        body: JSON.stringify({ bookingId: orderId, bookingStatus: newStatus })
+      });
+      const result = await response.json();
+      if (!response.ok) console.warn('Status update failed:', result?.message);
+    } catch (err) {
+      console.error('Update status error:', err);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // Safe helper extraction functions matching the API schema
+  const getOrderId = (o) => {
+    if (!o) return 'N/A';
+    return o.orderUniqueId || o.bookingId || o.orderId || (o._id ? `#${o._id.slice(-6)}` : 'N/A');
+  };
+
+  const getCustomerName = (o) => {
+    if (!o) return 'Customer';
+    const name = o.deliveryAddress?.name || o.customerName || o.customer?.name || o.userId?.name || o.user?.name || o.name;
+    if (!name) return 'Customer';
+    if (typeof name === 'string') return name;
+    if (typeof name === 'object') return String(name.name || 'Customer');
+    return String(name);
+  };
+
+  const getCustomerPhone = (o) => {
+    if (!o) return 'N/A';
+    const phone = o.deliveryAddress?.phone || o.customerPhone || o.customer?.phone || o.userId?.phone || o.user?.phone || o.phone;
+    if (!phone) return 'N/A';
+    if (typeof phone === 'string' || typeof phone === 'number') return String(phone);
+    if (typeof phone === 'object') return String(phone.phone || phone.number || 'N/A');
+    return String(phone);
+  };
+
+  const getCustomerAddress = (o) => {
+    if (!o) return 'Self Pickup / In-Store';
+    const addr = o.deliveryAddress ?? o.address ?? o.customer?.address ?? o.userId?.address;
+    if (!addr) return 'Self Pickup / In-Store';
+    if (typeof addr === 'string') return addr;
+    if (typeof addr === 'object') {
+      const parts = [
+        addr.address,
+        addr.landmark,
+        addr.city,
+        addr.state,
+        addr.postalCode
+      ].filter(p => typeof p === 'string' && p.trim().length > 0);
+      if (parts.length > 0) return parts.join(', ');
+      return String(addr.name || addr.phone || 'Address Details');
+    }
+    return String(addr);
+  };
+
+  const getOrderTotal = (o) => {
+    if (!o) return '₹0.00';
+    const val = o.totalAmount ?? o.grandTotal ?? o.totalPrice ?? o.productTotal ?? o.total ?? 0;
+    const num = Number(val) || 0;
+    return `₹${num.toFixed(2)}`;
+  };
+
+  const getPaymentMethod = (o) => {
+    if (!o) return 'CASH';
+    const m = o.paymentMethod || o.paymentMode || 'cash';
+    return typeof m === 'string' ? m.toUpperCase() : 'CASH';
+  };
+
+  const getPaymentStatus = (o) => {
+    if (!o) return 'Pending';
+    const s = o.paymentStatus || 'pending';
+    return typeof s === 'string' ? s.charAt(0).toUpperCase() + s.slice(1) : String(s);
+  };
+
+  const getOrderStatus = (o) => {
+    if (!o) return 'pending';
+    const s = o.bookingStatus || o.orderStatus || o.status || 'pending';
+    const lower = typeof s === 'string' ? s.toLowerCase() : 'pending';
+    if (lower === 'cooking' || lower === 'confirmed') return 'preparing';
+    return lower;
+  };
+
+  const getOrderType = (o) => {
+    if (!o) return 'Delivery';
+    const t = o.orderType || o.bookingType || o.type || 'delivery';
+    if (typeof t === 'string') {
+      return t.charAt(0).toUpperCase() + t.slice(1);
+    }
+    return 'Delivery';
+  };
+
+  const getOrderTime = (o) => {
+    if (!o) return 'Recent';
+    if (o.date && o.time) return `${o.date} • ${o.time}`;
+    if (o.logCreatedDate || o.createdAt) {
+      try {
+        const d = new Date(o.logCreatedDate || o.createdAt);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleDateString() + ' • ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+      } catch {}
+    }
+    return o.time || o.date || 'Recent';
+  };
+
+  const getOrderProducts = (o) => {
+    if (!o) return [];
+    const raw = o.products || o.items || o.orderItems || o.foodItems || o.cart || [];
+    if (!Array.isArray(raw)) return [];
+    return raw.map((it) => {
+      if (!it) return { name: 'Item', qty: 1, price: 0, total: 0, foodType: '' };
+      const name = typeof it === 'string'
+        ? it
+        : (typeof it.name === 'string' ? it.name : it.foodName || it.title || 'Food Item');
+      const qty = Number(it.quantity || it.qty || 1);
+      const price = Number(it.offerPrice || it.price || 0);
+      const total = it.productTotal !== undefined ? Number(it.productTotal) : (qty * price);
+      const foodType = it.foodType || '';
+      return {
+        name: typeof name === 'object' ? String(name.name || 'Food Item') : String(name),
+        qty,
+        price,
+        total,
+        foodType
+      };
+    });
+  };
+
+  // Determine overall dietary classification for the order
+  const getOrderDietaryType = (o) => {
+    const products = getOrderProducts(o);
+    if (products.length === 0) return { label: 'General', isVeg: null };
+
+    const hasVeg = products.some(p => (p.foodType || '').toLowerCase().includes('veg') && !(p.foodType || '').toLowerCase().includes('non'));
+    const hasNonVeg = products.some(p => (p.foodType || '').toLowerCase().includes('non'));
+
+    if (hasVeg && hasNonVeg) {
+      return { label: 'Mixed', isVeg: 'mixed' };
+    }
+    if (hasNonVeg) {
+      return { label: 'Non-Veg', isVeg: false };
+    }
+    if (hasVeg) {
+      return { label: 'Veg', isVeg: true };
+    }
+    return { label: 'General', isVeg: null };
+  };
+
+  const getInvoiceUrl = (invoicePath) => {
+    if (!invoicePath) return null;
+    if (invoicePath.startsWith('http://') || invoicePath.startsWith('https://')) return invoicePath;
+    const clean = invoicePath.replace(/\\/g, '/').replace(/^\/+/, '');
+    const base = URLS.Base || 'http://16.113.133.178:3000/';
+    const baseWithSlash = base.endsWith('/') ? base : `${base}/`;
+    return `${baseWithSlash}${clean}`;
+  };
+
+  // Status Filter Tabs with Accepted, Preparing & Ready added
+  const statusTabs = ['All', 'Pending', 'Accepted', 'Preparing', 'Ready', 'Delivered', 'Cancelled'];
 
   // Filtering
   const filtered = orders.filter(o => {
-    const matchesStatus = filter === 'All' || o.status === filter;
-    const matchesType = typeFilter === 'All' || o.type === typeFilter;
+    const s = getOrderStatus(o);
+    const matchesStatus =
+      filter === 'All' ||
+      (filter === 'Cancelled' ? (s === 'cancelled' || s === 'rejected') : s === filter.toLowerCase());
+
+    const searchLower = search.toLowerCase();
+    const idStr = String(getOrderId(o)).toLowerCase();
+    const custStr = String(getCustomerName(o)).toLowerCase();
+    const phoneStr = String(getCustomerPhone(o)).toLowerCase();
+    const addrStr = String(getCustomerAddress(o)).toLowerCase();
+
     const matchesSearch =
-      o.id.toLowerCase().includes(search.toLowerCase()) ||
-      o.customer.toLowerCase().includes(search.toLowerCase()) ||
-      o.phone.includes(search) ||
-      o.address.toLowerCase().includes(search.toLowerCase());
-    return matchesStatus && matchesType && matchesSearch;
+      idStr.includes(searchLower) ||
+      custStr.includes(searchLower) ||
+      phoneStr.includes(searchLower) ||
+      addrStr.includes(searchLower);
+
+    return matchesStatus && matchesSearch;
   });
 
   return (
     <div style={{ width: '100%' }}>
+      {/* Header */}
       <div className="page-header">
         <div>
           <h1 className="page-title"><ShoppingCart size={22} color="var(--primary)" /> Real-Time Order Management</h1>
-          <p className="page-desc">Process live incoming food tickets, kitchen cooking queues, and courier pickups</p>
+          <p className="page-desc">Process live incoming food bookings, kitchen cooking queues, and courier pickups</p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
+          <button
+            onClick={fetchOrders}
+            disabled={loading}
+            className="btn btn-outline"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            title="Refresh bookings"
+          >
+            <RefreshCw size={15} className={loading ? 'fp-spinner' : ''} />
+            <span>Refresh</span>
+          </button>
           <button className="btn btn-outline" onClick={() => window.print()}>
             <Printer size={15} /> Print Report
           </button>
         </div>
       </div>
 
-      {/* Top Filter & Search Bar */}
-      <div className="card" style={{ padding: 16, marginBottom: 20 }}>
-        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-          {/* Search bar */}
-          <div style={{ position: 'relative', flex: 1, minWidth: 260 }}>
-            <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-light)' }} />
+      {error && (
+        <div
+          className="card"
+          style={{
+            background: 'var(--danger-bg)',
+            border: '1px solid #fecaca',
+            color: 'var(--danger)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: 14,
+            marginBottom: 20
+          }}
+        >
+          <AlertCircle size={20} /> {error}
+        </div>
+      )}
+
+      {/* Top Search Bar & Status Filter in Same Line */}
+      <div className="card orders-filter-bar">
+        <div className="orders-filter-row">
+          {/* Search bar on the left */}
+          <div className="orders-search-box">
+            <Search size={16} className="orders-search-icon" />
             <input
               type="text"
-              placeholder="Search by Order ID (#ORD-), Customer Name, Phone, or Street Address..."
-              className="form-input"
-              style={{ paddingLeft: 38 }}
+              placeholder="Search by ID, Name, Phone..."
+              className="form-input orders-search-input"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
 
-          {/* Channel selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Channel:</span>
-            <select
-              className="form-select"
-              style={{ width: 'auto', padding: '8px 12px' }}
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-            >
-              <option value="All">All Channels</option>
-              <option value="Delivery">Delivery (Courier)</option>
-              <option value="Takeaway">Self Takeaway</option>
-              <option value="Dine-In">Table QR Dine-In</option>
-            </select>
+          {/* Status Tabs on the right in the same line */}
+          <div className="orders-tabs-group">
+            {statusTabs.map(s => {
+              const count = s === 'All'
+                ? orders.length
+                : orders.filter(x => {
+                    const st = getOrderStatus(x);
+                    return s === 'Cancelled' ? (st === 'cancelled' || st === 'rejected') : st === s.toLowerCase();
+                  }).length;
+              const active = filter === s;
+              return (
+                <button
+                  key={s}
+                  onClick={() => setFilter(s)}
+                  className={`btn btn-sm orders-tab-btn ${active ? 'btn-primary' : 'btn-outline'}`}
+                >
+                  {s} ({count})
+                </button>
+              );
+            })}
           </div>
-        </div>
-
-        {/* Status Tabs with count badges */}
-        <div style={{ display: 'flex', gap: 8, marginTop: 14, overflowX: 'auto', paddingBottom: 4 }}>
-          {statuses.map(s => {
-            const count = s === 'All' ? orders.length : orders.filter(x => x.status === s).length;
-            const active = filter === s;
-            return (
-              <button
-                key={s}
-                onClick={() => setFilter(s)}
-                className={`btn btn-sm ${active ? 'btn-primary' : 'btn-outline'}`}
-                style={{ borderRadius: 999 }}
-              >
-                {s} ({count})
-              </button>
-            );
-          })}
         </div>
       </div>
 
       {/* Orders Data Table */}
       <div className="card">
-        <div className="table-container">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Order Ticket</th>
-                <th>Customer & Location</th>
-                <th>Ordered Items Summary</th>
-                <th>Payment / Total</th>
-                <th>Status</th>
-                <th>Kitchen Dispatch Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(o => (
-                <tr key={o.id}>
-                  <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <strong style={{ fontSize: 14, color: 'var(--primary)' }}>{o.id}</strong>
-                      <span className="badge badge-muted" style={{ fontSize: 10.5 }}>{o.type}</span>
-                    </div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
-                      <Clock size={11} /> {o.time}
-                    </div>
-                  </td>
-
-                  <td>
-                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{o.customer}</div>
-                    <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{o.address}</div>
-                    <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{o.phone}</div>
-                  </td>
-
-                  <td style={{ maxWidth: 280 }}>
-                    <div style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.4 }}>
-                      {o.items.map((it, i) => (
-                        <div key={i}>• {it.qty}x {it.name}</div>
-                      ))}
-                    </div>
-                    {o.notes && (
-                      <div style={{ fontSize: 11, color: '#d97706', marginTop: 3 }}>
-                        Note: {o.notes}
-                      </div>
-                    )}
-                  </td>
-
-                  <td>
-                    <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)' }}>{o.total}</div>
-                    <span className="badge badge-info" style={{ fontSize: 10, marginTop: 3 }}>
-                      {o.payment}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span className={`badge ${
-                      o.status === 'Pending' ? 'badge-warning' :
-                      o.status === 'Preparing' ? 'badge-primary' :
-                      o.status === 'Ready' ? 'badge-success' : 'badge-muted'
-                    }`}>
-                      {o.status === 'Pending' ? '⏳ Pending Review' :
-                       o.status === 'Preparing' ? '🔥 Cooking in Kitchen' :
-                       o.status === 'Ready' ? '✓ Ready for Pickup' : 'Completed'}
-                    </span>
-                  </td>
-
-                  <td>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      <button
-                        className="btn btn-outline btn-sm"
-                        title="View Full Ticket"
-                        onClick={() => setSelectedOrder(o)}
-                      >
-                        <Eye size={13} />
-                      </button>
-
-                      {o.status === 'Pending' && (
-                        <>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => updateStatus(o.id, 'Preparing')}
-                          >
-                            <Check size={12} /> Accept
-                          </button>
-                          <button
-                            className="btn btn-danger btn-sm"
-                            onClick={() => updateStatus(o.id, 'Cancelled')}
-                          >
-                            <X size={12} /> Reject
-                          </button>
-                        </>
-                      )}
-
-                      {o.status === 'Preparing' && (
-                        <button
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => updateStatus(o.id, 'Ready')}
-                        >
-                          <ChefHat size={12} /> Mark Packed
-                        </button>
-                      )}
-
-                      {o.status === 'Ready' && (
-                        <button
-                          className="btn btn-primary btn-sm"
-                          onClick={() => updateStatus(o.id, 'Delivered')}
-                        >
-                          <Bike size={12} /> Hand Over
-                        </button>
-                      )}
-
-                      {o.status === 'Delivered' && (
-                        <span style={{ fontSize: 12, color: 'var(--success)', fontWeight: 600 }}>
-                          ✓ Fulfilled
-                        </span>
-                      )}
-                    </div>
-                  </td>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
+            <RefreshCw size={28} className="fp-spinner" style={{ margin: '0 auto 12px' }} />
+            <p style={{ margin: 0 }}>Loading bookings and orders...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
+            <ShoppingCart size={36} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>No Orders Found</h3>
+            <p style={{ fontSize: 13, margin: 0 }}>
+              {search || filter !== 'All'
+                ? 'No orders match the selected filters.'
+                : 'There are no active bookings for your restaurant at the moment.'}
+            </p>
+          </div>
+        ) : (
+          <div className="table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Order Ticket</th>
+                  <th>Customer & Location</th>
+                  <th>Ordered Items</th>
+                  <th>Dietary Type</th>
+                  <th>Payment</th>
+                  <th>Status</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {filtered.map(o => {
+                  const orderId = getOrderId(o);
+                  const custName = getCustomerName(o);
+                  const custPhone = getCustomerPhone(o);
+                  const custAddr = getCustomerAddress(o);
+                  const total = getOrderTotal(o);
+                  const payMethod = getPaymentMethod(o);
+                  const payStatus = getPaymentStatus(o);
+                  const status = getOrderStatus(o);
+                  const time = getOrderTime(o);
+                  const products = getOrderProducts(o);
+                  const dietary = getOrderDietaryType(o);
+                  const invoiceLink = getInvoiceUrl(o.invoice);
+                  const mongoId = o._id || o.id || o.bookingId;
+
+                  return (
+                    <tr key={mongoId || orderId}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <strong style={{ fontSize: 13.5, color: 'var(--primary)' }}>
+                            {orderId}
+                          </strong>
+                        </div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-muted)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <Clock size={11} /> {time}
+                        </div>
+                      </td>
+
+                      <td>
+                        <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{custName}</div>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{custAddr}</div>
+                        <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{custPhone}</div>
+                      </td>
+
+                      <td style={{ maxWidth: 260 }}>
+                        {products.length === 0 ? (
+                          <span style={{ fontSize: 12.5, color: 'var(--text-muted)' }}>-</span>
+                        ) : (
+                          <div style={{ fontSize: 13, color: 'var(--text-main)', lineHeight: 1.4 }}>
+                            {products.slice(0, 3).map((it, i) => (
+                              <div key={i}>
+                                • {it.qty}x <strong>{it.name}</strong>
+                              </div>
+                            ))}
+                            {products.length > 3 && (
+                              <div style={{ fontSize: 11.5, color: 'var(--text-muted)' }}>+{products.length - 3} more items</div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Separate Dietary Type Column */}
+                      <td>
+                        {dietary.isVeg === true && (
+                          <span className="badge badge-success">Veg</span>
+                        )}
+                        {dietary.isVeg === false && (
+                          <span className="badge badge-danger">Non-Veg</span>
+                        )}
+                        {dietary.isVeg === 'mixed' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                            <span className="badge badge-success" style={{ fontSize: 10 }}>Veg</span>
+                            <span className="badge badge-danger" style={{ fontSize: 10 }}>Non-Veg</span>
+                          </div>
+                        )}
+                        {dietary.isVeg === null && (
+                          <span className="badge badge-muted">-</span>
+                        )}
+                      </td>
+
+                      <td>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-main)' }}>{total}</div>
+                        <span className="badge badge-info" style={{ fontSize: 10, marginTop: 3 }}>
+                          {payMethod} ({payStatus})
+                        </span>
+                      </td>
+
+                      <td>
+                        <span className={`badge ${
+                          status === 'pending' ? 'badge-warning' :
+                          status === 'accepted' ? 'badge-info' :
+                          status === 'preparing' ? 'badge-primary' :
+                          status === 'ready' ? 'badge-info' :
+                          status === 'delivered' ? 'badge-success' : 'badge-danger'
+                        }`}>
+                          {status === 'pending' ? '⏳ Pending' :
+                           status === 'accepted' ? '🤝 Accepted' :
+                           status === 'preparing' ? '🔥 Preparing' :
+                           status === 'ready' ? '📦 Ready' :
+                           status === 'delivered' ? '✓ Delivered' :
+                           status === 'rejected' ? '✕ Rejected' :
+                           status === 'cancelled' ? '✕ Cancelled' : status}
+                        </span>
+                      </td>
+
+                      {/* Actions Column with Equal Length Buttons */}
+                      <td>
+                        <div className="orders-action-cell">
+                          {status === 'pending' && (
+                            <>
+                              <button
+                                className="btn btn-sm orders-action-btn orders-btn-icon-only orders-btn-accept"
+                                disabled={updatingId === mongoId}
+                                title="Accept Incoming Order"
+                                onClick={() => handleUpdateStatus(mongoId, 'accepted')}
+                              >
+                                <Check size={13} />
+                              </button>
+                              <button
+                                className="btn btn-sm btn-danger orders-action-btn orders-btn-icon-only"
+                                disabled={updatingId === mongoId}
+                                title="Reject Incoming Order"
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to reject order ${orderId}?`)) {
+                                    handleUpdateStatus(mongoId, 'rejected');
+                                  }
+                                }}
+                              >
+                                <X size={13} />
+                              </button>
+                            </>
+                          )}
+
+                          {status === 'accepted' && (
+                            <button
+                              className="btn btn-sm btn-primary orders-action-btn orders-btn-labeled"
+                              disabled={updatingId === mongoId}
+                              title="Start Cooking / Preparing in Kitchen"
+                              onClick={() => handleUpdateStatus(mongoId, 'preparing')}
+                            >
+                              <ChefHat size={12} />
+                              <span>Prepare</span>
+                            </button>
+                          )}
+
+                          {status === 'preparing' && (
+                            <button
+                              className="btn btn-sm btn-primary orders-action-btn orders-btn-labeled orders-btn-ready"
+                              disabled={updatingId === mongoId}
+                              title="Mark Food Ready for Courier Pickup"
+                              onClick={() => handleUpdateStatus(mongoId, 'ready')}
+                            >
+                              <ChefHat size={12} />
+                              <span>Ready</span>
+                            </button>
+                          )}
+
+                          {status === 'ready' && (
+                            <button
+                              className="btn btn-sm btn-primary orders-action-btn orders-btn-labeled orders-btn-deliver"
+                              disabled={updatingId === mongoId}
+                              title="Hand Over Order / Mark Delivered"
+                              onClick={() => handleUpdateStatus(mongoId, 'delivered')}
+                            >
+                              <Bike size={12} />
+                              <span>Deliver</span>
+                            </button>
+                          )}
+
+                          <button
+                            className="btn btn-outline btn-sm orders-action-btn orders-btn-icon-only"
+                            title="View Full Booking Ticket"
+                            onClick={() => handleViewOrder(o)}
+                          >
+                            <Eye size={13} />
+                          </button>
+
+                          {invoiceLink && (
+                            <a
+                              href={invoiceLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="btn btn-outline btn-sm orders-action-btn orders-btn-icon-only"
+                              style={{ textDecoration: 'none' }}
+                              title="Download Tax Invoice PDF"
+                            >
+                              <FileText size={12} />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Order Ticket Detail Modal */}
-      {selectedOrder && (
-        <div className="modal-overlay">
-          <div className="modal-card">
-            <div className="modal-header">
-              <div>
-                <h3 style={{ fontSize: 16, fontWeight: 800 }}>Order Details: {selectedOrder.id}</h3>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{selectedOrder.time} • Channel: {selectedOrder.type}</span>
-              </div>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="modal-body">
-              <div style={{ background: '#f8fafc', padding: 14, borderRadius: 10, border: '1px solid var(--border)', marginBottom: 16 }}>
-                <div style={{ fontWeight: 700, fontSize: 14 }}>{selectedOrder.customer}</div>
-                <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>📍 {selectedOrder.address}</div>
-                <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginTop: 2 }}>📞 {selectedOrder.phone}</div>
-                {selectedOrder.notes && (
-                  <div style={{ marginTop: 8, padding: '6px 10px', background: '#fffbeb', color: '#b45309', borderRadius: 6, fontSize: 12 }}>
-                    <strong>Kitchen Instruction:</strong> {selectedOrder.notes}
-                  </div>
-                )}
-              </div>
-
-              <h4 style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10 }}>Itemized Food Bill</h4>
-              <div style={{ border: '1px solid var(--border)', borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
-                {selectedOrder.items.map((it, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      padding: '10px 14px',
-                      borderBottom: idx === selectedOrder.items.length - 1 ? 'none' : '1px solid var(--border)',
-                      fontSize: 13
-                    }}
-                  >
-                    <span>{it.qty}x {it.name}</span>
-                    <strong>${(it.qty * it.price).toFixed(2)}</strong>
-                  </div>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, padding: '8px 4px' }}>
-                <span>Grand Total:</span>
-                <span style={{ color: 'var(--primary)' }}>{selectedOrder.total}</span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--text-muted)', textAlign: 'right' }}>
-                Payment: {selectedOrder.payment}
-              </div>
-            </div>
-
-            <div className="modal-footer">
-              <button className="btn btn-outline" onClick={() => setSelectedOrder(null)}>
-                Close
-              </button>
-              {selectedOrder.status === 'Pending' && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => updateStatus(selectedOrder.id, 'Preparing')}
-                >
-                  Accept & Start Cooking
-                </button>
-              )}
-              {selectedOrder.status === 'Preparing' && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => updateStatus(selectedOrder.id, 'Ready')}
-                >
-                  Mark Packed & Ready
-                </button>
-              )}
-              {selectedOrder.status === 'Ready' && (
-                <button
-                  className="btn btn-primary"
-                  onClick={() => updateStatus(selectedOrder.id, 'Delivered')}
-                >
-                  Confirm Hand Over to Courier
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Separated View Order Modal Component */}
+      <ViewOrder
+        order={selectedOrder}
+        isOpen={Boolean(selectedOrder)}
+        onClose={() => setSelectedOrder(null)}
+        onUpdateStatus={handleUpdateStatus}
+        updatingId={updatingId}
+        detailLoading={detailLoading}
+        detailError={detailError}
+      />
     </div>
   );
 }

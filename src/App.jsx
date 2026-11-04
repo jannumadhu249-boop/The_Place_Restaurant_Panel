@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 // Layout
 import Layout from './components/Layout';
 
 // Components
-import Restaurant from './components/Restaurant';
 import Login from './components/Login';
 import ForgotPassword from './components/ForgotPassword';
 import Profile from './components/Profile';
@@ -34,6 +33,12 @@ import EditCampaign from './pages/Campaigns/EditCampaign';
 import MyWallet from './pages/MyWallet/MyWallet';
 import RequestPayout from './pages/MyWallet/RequestPayout';
 
+// Reports Management
+import OrderReport from './pages/ReportsManagement/OrderReport';
+import TaxReport from './pages/ReportsManagement/TaxReport';
+import TransactionReport from './pages/ReportsManagement/TransactionReport';
+import FoodReport from './pages/ReportsManagement/FoodReport';
+
 // Employee Management
 import EmployeeRole from './pages/EmployeeManagement/EmployeeRole';
 import CreateEmployeeRole from './pages/EmployeeManagement/CreateEmployeeRole';
@@ -55,22 +60,87 @@ import EditSubCategory from './pages/FoodManagement/EditSubCategory';
 
 // Order Management
 import Orders from './pages/OrderManagement/Orders';
+import ViewOrder from './pages/OrderManagement/ViewOrder';
+
+// Service Options
+import DineIn from './pages/ServiceOptions/DineIn';
+import Takeaway from './pages/ServiceOptions/Takeaway';
+
+// Billing
+import Billing from './pages/BillingSettlement/Billing';
+
+function getStoredToken() {
+  return localStorage.getItem('token') || '';
+}
+
+/** Blocks panel routes when there is no auth token — redirects to login (keeps intended path). */
+function ProtectedRoute({ isAuthenticated, children }) {
+  const location = useLocation();
+  if (!isAuthenticated || !getStoredToken()) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+  return children;
+}
+
+/** Sends already-logged-in users away from login / forgot-password. */
+function PublicOnlyRoute({ isAuthenticated, children }) {
+  if (isAuthenticated && getStoredToken()) {
+    return <Navigate to="/" replace />;
+  }
+  return children;
+}
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredToken()));
+
+  // Keep React state in sync if token is cleared elsewhere (e.g. another tab)
+  useEffect(() => {
+    const syncAuth = () => setIsAuthenticated(Boolean(getStoredToken()));
+    window.addEventListener('storage', syncAuth);
+    return () => window.removeEventListener('storage', syncAuth);
+  }, []);
+
+  const handleLogin = () => setIsAuthenticated(true);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('restaurant_user');
+    setIsAuthenticated(false);
+  };
 
   return (
     <BrowserRouter>
       <Routes>
-        {/* Auth Routes */}
-        <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
+        {/* Auth Routes — only when logged out */}
+        <Route
+          path="/login"
+          element={
+            <PublicOnlyRoute isAuthenticated={isAuthenticated}>
+              <Login onLogin={handleLogin} />
+            </PublicOnlyRoute>
+          }
+        />
+        <Route
+          path="/forgot-password"
+          element={
+            <PublicOnlyRoute isAuthenticated={isAuthenticated}>
+              <ForgotPassword />
+            </PublicOnlyRoute>
+          }
+        />
 
-        {/* Panel Main Routes */}
-        <Route path="/" element={<Layout onLogout={() => setIsAuthenticated(false)} />}>
+        {/* Panel Main Routes — require token */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute isAuthenticated={isAuthenticated}>
+              <Layout onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        >
           <Route index element={<Dashboard />} />
-          <Route path="restaurant" element={<Restaurant />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="restaurant" element={<Navigate to="/profile" replace />} />
           <Route path="change-password" element={<ChangePassword />} />
 
           {/* Happy Hours */}
@@ -97,12 +167,31 @@ export default function App() {
           <Route path="wallet" element={<Navigate to="/my-wallet" replace />} />
           <Route path="wallet/request-payout" element={<Navigate to="/my-wallet/request-payout" replace />} />
 
+          {/* Reports Management */}
+          <Route path="reports/order" element={<OrderReport />} />
+          <Route path="reports/tax" element={<TaxReport />} />
+          <Route path="reports/transaction" element={<TransactionReport />} />
+          <Route path="reports/food" element={<FoodReport />} />
+
           {/* Reviews */}
           <Route path="reviews" element={<Reviews />} />
           <Route path="review" element={<Navigate to="/reviews" replace />} />
 
           {/* Orders */}
           <Route path="orders" element={<Orders />} />
+          <Route path="orders/view/:id" element={<ViewOrder />} />
+
+          {/* Service Options */}
+          <Route path="service/dine-in" element={<DineIn />} />
+          <Route path="service/takeaway" element={<Takeaway />} />
+          <Route path="dine-in" element={<Navigate to="/service/dine-in" replace />} />
+          <Route path="takeaway" element={<Navigate to="/service/takeaway" replace />} />
+
+          {/* Billing */}
+          <Route path="billing" element={<Billing />} />
+          <Route path="settlement" element={<Navigate to="/billing" replace />} />
+          <Route path="billing-settlement/billing" element={<Navigate to="/billing" replace />} />
+          <Route path="billing-settlement/settlement" element={<Navigate to="/billing" replace />} />
 
           {/* Employee Management */}
           <Route path="employee-management/roles" element={<EmployeeRole />} />
@@ -124,8 +213,15 @@ export default function App() {
           <Route path="food-management/edit-sub-category/:id" element={<EditSubCategory />} />
         </Route>
 
-        {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+        {/* Catch-all — unauthenticated → login, authenticated → home */}
+        <Route
+          path="*"
+          element={
+            isAuthenticated && getStoredToken()
+              ? <Navigate to="/" replace />
+              : <Navigate to="/login" replace />
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

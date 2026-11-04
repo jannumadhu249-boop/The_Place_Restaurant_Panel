@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -8,22 +8,26 @@ import {
   Users,
   Shield,
   ShoppingCart,
-  Clock,
-  Tag,
   Wallet,
   Star,
-  Megaphone,
-  Store,
-  LogOut
+  FileBarChart,
+  Receipt,
+  ArrowLeftRight,
+  Pizza,
+  Armchair,
+  ShoppingBag
 } from 'lucide-react';
 import Header from './Header';
 
 export default function Layout({ onLogout }) {
   const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('restaurant_user');
     if (onLogout) onLogout();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   const navLinks = [
@@ -31,43 +35,52 @@ export default function Layout({ onLogout }) {
     { to: '/', label: 'Dashboard', icon: LayoutDashboard },
     { to: '/orders', label: 'Order Management', icon: ShoppingCart },
 
+    { section: 'Service Options' },
+    { to: '/service/dine-in', label: 'Dine-in', icon: Armchair },
+    { to: '/service/takeaway', label: 'Takeaway', icon: ShoppingBag },
+
+    { section: 'Billing' },
+    { to: '/billing', label: 'Billing', icon: Receipt },
+
     { section: 'Food Management' },
     { to: '/food-management/foods', label: 'Foods Menu', icon: UtensilsCrossed },
     { to: '/food-management/categories', label: 'Categories', icon: Layers },
     { to: '/food-management/sub-categories', label: 'Sub-Categories', icon: Network },
 
-    { section: 'Staff & Roles' },
-    { to: '/employee-management/employees', label: 'Employees', icon: Users },
-    { to: '/employee-management/roles', label: 'Employee Roles', icon: Shield },
-
     { section: 'Marketing & Sales' },
-    { to: '/happy-hours', label: 'Happy Hours', icon: Clock },
-    { to: '/coupons', label: 'Coupons', icon: Tag },
-    { to: '/campaigns', label: 'Campaigns', icon: Megaphone },
     { to: '/reviews', label: 'Customer Reviews', icon: Star },
     { to: '/my-wallet', label: 'My Wallet', icon: Wallet },
 
-    { section: 'Store Settings' },
-    { to: '/restaurant', label: 'Restaurant Info', icon: Store }
+    { section: 'Reports Management' },
+    { to: '/reports/order', label: 'Order Report', icon: FileBarChart },
+    { to: '/reports/tax', label: 'Tax Report', icon: Receipt },
+    { to: '/reports/transaction', label: 'Transaction Report', icon: ArrowLeftRight },
+    { to: '/reports/food', label: 'Food Report', icon: Pizza },
+
+    { section: 'Staff & Roles' },
+    { to: '/employee-management/employees', label: 'Employees', icon: Users },
+    { to: '/employee-management/roles', label: 'Employee Roles', icon: Shield },
   ];
 
   return (
-    <div className="app-container">
-      {/* Fixed Scrollable Sidebar */}
-      <aside className="fixed-sidebar">
+    <div className={`app-container ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+      <aside className={`fixed-sidebar ${sidebarCollapsed ? 'is-collapsed' : ''}`}>
         <div className="sidebar-header">
           <div className="brand-icon">
             <UtensilsCrossed size={22} />
           </div>
-          <div>
-            <div className="brand-title">Spice Garden</div>
-            <div className="brand-sub">Store Panel</div>
-          </div>
+          {!sidebarCollapsed && (
+            <div className="brand-text">
+              <div className="brand-title">The Place</div>
+              <div className="brand-sub">Store Panel</div>
+            </div>
+          )}
         </div>
 
         <nav className="sidebar-menu">
           {navLinks.map((item, idx) => {
             if (item.section) {
+              if (sidebarCollapsed) return null;
               return <div key={idx} className="nav-section-title">{item.section}</div>;
             }
             return (
@@ -75,29 +88,23 @@ export default function Layout({ onLogout }) {
                 key={item.to}
                 to={item.to}
                 end={item.to === '/'}
+                title={sidebarCollapsed ? item.label : undefined}
                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               >
                 <item.icon size={17} />
-                <span>{item.label}</span>
+                {!sidebarCollapsed && <span>{item.label}</span>}
               </NavLink>
             );
           })}
         </nav>
-
-        {/* <div className="sidebar-footer">
-          <button
-            onClick={handleLogout}
-            className="btn btn-outline"
-            style={{ width: '100%', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)', justifyContent: 'center' }}
-          >
-            <LogOut size={15} /> Sign Out
-          </button>
-        </div> */}
       </aside>
 
-      {/* Main Right Content */}
       <div className="main-wrapper">
-        <Header onLogout={onLogout} />
+        <Header
+          onLogout={onLogout}
+          sidebarCollapsed={sidebarCollapsed}
+          onToggleSidebar={() => setSidebarCollapsed((prev) => !prev)}
+        />
         <main className="page-content">
           <Outlet />
         </main>

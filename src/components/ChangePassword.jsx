@@ -1,12 +1,19 @@
 import React, { useState } from 'react';
-import { KeyRound, ShieldCheck, AlertCircle, Save, Lock } from 'lucide-react';
+import { KeyRound, ShieldCheck, AlertCircle, Save, Lock, Eye, EyeOff } from 'lucide-react';
+import { URLS } from '../url';
 
 export default function ChangePassword() {
   const [passwords, setPasswords] = useState({ current: '', newPass: '', confirm: '' });
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNew, setShowNew] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [status, setStatus] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setStatus(null);
+
     if (passwords.newPass !== passwords.confirm) {
       setStatus({ type: 'error', message: 'New password and confirmation do not match.' });
       return;
@@ -15,9 +22,47 @@ export default function ChangePassword() {
       setStatus({ type: 'error', message: 'Password must be at least 6 characters long.' });
       return;
     }
-    setStatus({ type: 'success', message: 'Your store password has been updated successfully!' });
-    setPasswords({ current: '', newPass: '', confirm: '' });
-    setTimeout(() => setStatus(null), 3500);
+
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setStatus({
+        type: 'error',
+        message: 'Authorization token not found. Please log in again to update your password.'
+      });
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(URLS.ChangePassword, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          currentPassword: passwords.current,
+          newPassword: passwords.newPass,
+          confirmPassword: passwords.confirm
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setStatus({ type: 'success', message: result.message || 'Your store password has been updated successfully!' });
+        setPasswords({ current: '', newPass: '', confirm: '' });
+      } else {
+        setStatus({ type: 'error', message: result.message || 'Failed to update password. Please verify your current password.' });
+      }
+    } catch (err) {
+      console.error('Change password error:', err);
+      setStatus({ type: 'error', message: 'Unable to connect to the server. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -40,6 +85,7 @@ export default function ChangePassword() {
             alignItems: 'center',
             gap: 10,
             padding: 14,
+            marginBottom: 20,
             width: '100%'
           }}
         >
@@ -55,44 +101,85 @@ export default function ChangePassword() {
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Current Account Password</label>
-              <input
-                type="password"
-                className="form-input"
-                value={passwords.current}
-                onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
-                placeholder="Enter your current password"
-                required
-              />
+              <div className="fp-input-wrap">
+                <Lock size={15} className="fp-input-icon" />
+                <input
+                  type={showCurrent ? 'text' : 'password'}
+                  className="form-input fp-icon-input fp-pr-input"
+                  value={passwords.current}
+                  onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+                  placeholder="Enter your current password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="fp-eye-btn"
+                  onClick={() => setShowCurrent(!showCurrent)}
+                  tabIndex={-1}
+                >
+                  {showCurrent ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
               <label className="form-label">New Secure Password</label>
-              <input
-                type="password"
-                className="form-input"
-                value={passwords.newPass}
-                onChange={(e) => setPasswords({ ...passwords, newPass: e.target.value })}
-                placeholder="Minimum 6 characters"
-                required
-              />
+              <div className="fp-input-wrap">
+                <Lock size={15} className="fp-input-icon" />
+                <input
+                  type={showNew ? 'text' : 'password'}
+                  className="form-input fp-icon-input fp-pr-input"
+                  value={passwords.newPass}
+                  onChange={(e) => setPasswords({ ...passwords, newPass: e.target.value })}
+                  placeholder="Minimum 6 characters"
+                  required
+                />
+                <button
+                  type="button"
+                  className="fp-eye-btn"
+                  onClick={() => setShowNew(!showNew)}
+                  tabIndex={-1}
+                >
+                  {showNew ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
               <label className="form-label">Confirm New Password</label>
-              <input
-                type="password"
-                className="form-input"
-                value={passwords.confirm}
-                onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
-                placeholder="Re-enter new password"
-                required
-              />
+              <div className="fp-input-wrap">
+                <Lock size={15} className="fp-input-icon" />
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  className="form-input fp-icon-input fp-pr-input"
+                  value={passwords.confirm}
+                  onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+                  placeholder="Re-enter new password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="fp-eye-btn"
+                  onClick={() => setShowConfirm(!showConfirm)}
+                  tabIndex={-1}
+                >
+                  {showConfirm ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </div>
             </div>
           </div>
 
           <div style={{ marginTop: 24 }}>
-            <button type="submit" className="btn btn-primary">
-              <Save size={16} /> Update Password
+            <button type="submit" className="btn btn-primary" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <span className="fp-spinner" /> Updating Password…
+                </>
+              ) : (
+                <>
+                  <Save size={16} /> Update Password
+                </>
+              )}
             </button>
           </div>
         </form>

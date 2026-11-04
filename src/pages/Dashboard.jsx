@@ -14,25 +14,28 @@ import {
   Plus,
   ArrowRight,
   Sparkles,
-  Search
+  Search,
+  IndianRupee
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function Dashboard() {
   const [kitchenOrders, setKitchenOrders] = useState([
-    { id: '#ORD-8924', customer: 'Sophie Taylor', items: '2x Butter Chicken, 4x Garlic Naan, 2x Mango Lassi', total: '$48.50', time: '4 mins ago', status: 'Preparing', type: 'Delivery' },
-    { id: '#ORD-8923', customer: 'Rahul Sharma', items: '1x Paneer Tikka Masala, 2x Tandoori Roti', total: '$21.20', time: '11 mins ago', status: 'Preparing', type: 'Takeaway' },
-    { id: '#ORD-8922', customer: 'David Miller', items: '1x Chicken Biryani Feast Box, 1x Gulab Jamun', total: '$32.00', time: '18 mins ago', status: 'Ready', type: 'Delivery' },
-    { id: '#ORD-8921', customer: 'Emma Watson', items: '3x Veg Hakka Noodles, 1x Spring Rolls', total: '$36.80', time: '26 mins ago', status: 'Ready', type: 'Delivery' },
+    { id: '#ORD-8924', customer: 'Sophie Taylor', items: '2x Butter Chicken, 4x Garlic Naan, 2x Mango Lassi', total: '₹ 48.50', time: '4 mins ago', status: 'Preparing', type: 'Delivery' },
+    { id: '#ORD-8923', customer: 'Rahul Sharma', items: '1x Paneer Tikka Masala, 2x Tandoori Roti', total: '₹ 21.20', time: '11 mins ago', status: 'Preparing', type: 'Takeaway' },
+    { id: '#ORD-8922', customer: 'David Miller', items: '1x Chicken Biryani Feast Box, 1x Gulab Jamun', total: '₹ 32.00', time: '18 mins ago', status: 'Ready', type: 'Delivery' },
+    { id: '#ORD-8921', customer: 'Emma Watson', items: '3x Veg Hakka Noodles, 1x Spring Rolls', total: '₹ 36.80', time: '26 mins ago', status: 'Ready', type: 'Delivery' },
   ]);
 
   const topDishes = [
-    { rank: 1, name: 'Butter Chicken Special', category: 'Main Course', orders: 248, revenue: '$4,213.50', rate: '96%' },
-    { rank: 2, name: 'Paneer Butter Masala', category: 'Main Course', orders: 194, revenue: '$2,813.00', rate: '94%' },
-    { rank: 3, name: 'Garlic Butter Naan', category: 'Breads', orders: 420, revenue: '$1,470.00', rate: '99%' },
-    { rank: 4, name: 'Crispy Veg Spring Rolls', category: 'Starters', orders: 152, revenue: '$1,214.48', rate: '91%' },
-    { rank: 5, name: 'Mango Lassi Chilled', category: 'Beverages', orders: 180, revenue: '$898.20', rate: '95%' },
+    { rank: 1, name: 'Butter Chicken Special', category: 'Main Course', orders: 248, revenue: '₹ 4,213.50', rate: '96%', rating: 4.9 },
+    { rank: 2, name: 'Paneer Butter Masala', category: 'Main Course', orders: 194, revenue: '₹ 2,813.00', rate: '94%', rating: 4.7 },
+    { rank: 3, name: 'Garlic Butter Naan', category: 'Breads', orders: 420, revenue: '₹ 1,470.00', rate: '99%', rating: 4.8 },
+    { rank: 4, name: 'Crispy Veg Spring Rolls', category: 'Starters', orders: 152, revenue: '₹ 1,214.48', rate: '91%', rating: 4.5 },
+    { rank: 5, name: 'Mango Lassi Chilled', category: 'Beverages', orders: 180, revenue: '₹ 898.20', rate: '95%', rating: 4.6 },
   ];
+
+  const topRatedFood = [...topDishes].sort((a, b) => b.rating - a.rating)[0];
 
   const updateOrderStatus = (id, newStatus) => {
     setKitchenOrders(kitchenOrders.map(o => o.id === id ? { ...o, status: newStatus } : o));
@@ -49,7 +52,7 @@ export default function Dashboard() {
             </span>
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Real-Time Kitchen Feed</span>
           </div>
-          <h1 className="page-title">Welcome back, Spice Garden Bistro!</h1>
+          <h1 className="page-title">Welcome back, The Place!</h1>
           <p className="page-desc">Here is what's happening in your restaurant kitchen and delivery line today</p>
         </div>
 
@@ -67,11 +70,11 @@ export default function Dashboard() {
       <div className="stats-grid">
         <div className="stat-card" style={{ borderLeft: '4px solid var(--primary)' }}>
           <div className="stat-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
-            <DollarSign size={24} />
+            <IndianRupee size={24} />
           </div>
           <div>
             <div className="stat-label">Today's Revenue</div>
-            <div className="stat-value">$1,842.50</div>
+            <div className="stat-value">₹ 1,842.50</div>
             <div style={{ fontSize: 11.5, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 3, marginTop: 4, fontWeight: 600 }}>
               <TrendingUp size={13} /> +18.4% vs yesterday
             </div>
@@ -116,6 +119,19 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* <div className="stat-card" style={{ borderLeft: '4px solid #e11d48' }}>
+          <div className="stat-icon" style={{ background: '#fff1f2', color: '#e11d48' }}>
+            <Star size={24} fill="#e11d48" />
+          </div>
+          <div>
+            <div className="stat-label">Top Rated Food</div>
+            <div className="stat-value" style={{ fontSize: 18 }}>{topRatedFood.name}</div>
+            <div style={{ fontSize: 11.5, color: '#be123c', marginTop: 4, fontWeight: 600 }}>
+              ★ {topRatedFood.rating.toFixed(1)} · {topRatedFood.orders} orders
+            </div>
+          </div>
+        </div> */}
       </div>
 
       {/* Two-Column Layout for Kitchen Queue & Channel Analytics */}
@@ -189,67 +205,71 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Channel Analytics & Quick Metrics */}
-        <div className="card" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div className="card-header">
-              <div>
-                <h2 className="card-title">Order Channel Split</h2>
-                <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Revenue distribution across channels</p>
-              </div>
-              <span className="badge badge-primary">Today</span>
+        {/* Top Rated Food Card */}
+        <div className="card" style={{ marginBottom: 0, display: 'flex', flexDirection: 'column' }}>
+          <div className="card-header">
+            <div>
+              <h2 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Star size={19} color="#e11d48" fill="#e11d48" /> Top Rated Food
+              </h2>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Highest customer-rated dish this week</p>
             </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 8 }}>
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                  <span>🛵 Online App Delivery</span>
-                  <strong>68% ($1,252.90)</strong>
-                </div>
-                <div style={{ width: '100%', height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ width: '68%', height: '100%', background: 'var(--primary)', borderRadius: 999 }}></div>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                  <span>🥡 Customer Self Takeaway</span>
-                  <strong>22% ($405.35)</strong>
-                </div>
-                <div style={{ width: '100%', height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ width: '22%', height: '100%', background: '#10b981', borderRadius: 999 }}></div>
-                </div>
-              </div>
-
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                  <span>🍽️ In-Store Table QR</span>
-                  <strong>10% ($184.25)</strong>
-                </div>
-                <div style={{ width: '100%', height: 8, background: '#f1f5f9', borderRadius: 999, overflow: 'hidden' }}>
-                  <div style={{ width: '10%', height: '100%', background: '#6366f1', borderRadius: 999 }}></div>
-                </div>
-              </div>
-            </div>
+            <Link to="/food-management/foods" className='btn btn-outline btn-sm' style={{ padding: '4px 10px' }}>View All</Link>
           </div>
 
-          {/* Quick Actions Panel */}
-          <div style={{ background: '#f8fafc', padding: 16, borderRadius: 12, border: '1px solid var(--border)', marginTop: 24 }}>
-            <h3 style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12 }}>⚡ Manager Quick Actions</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
-              <Link to="/coupons" className="btn btn-outline btn-sm" style={{ justifyContent: 'center' }}>
-                New Coupon
-              </Link>
-              <Link to="/happy-hours" className="btn btn-outline btn-sm" style={{ justifyContent: 'center' }}>
-                Happy Hours
-              </Link>
-              <Link to="/my-wallet" className="btn btn-outline btn-sm" style={{ justifyContent: 'center' }}>
-                Wallet Payout
-              </Link>
-              <Link to="/restaurant" className="btn btn-outline btn-sm" style={{ justifyContent: 'center' }}>
-                Store Timing
-              </Link>
+          <div
+            style={{
+              flex: 1,
+              borderRadius: 14,
+              border: '1px solid var(--border)',
+              background: 'linear-gradient(160deg, #fff7ed 0%, #ffffff 45%, #fff1f2 100%)',
+              padding: 20,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 16
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+                  {topRatedFood.category}
+                </div>
+                <h3 style={{ fontSize: 22, fontWeight: 800, marginTop: 6, letterSpacing: -0.4, color: 'var(--text-main)' }}>
+                  {topRatedFood.name}
+                </h3>
+                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 6 }}>
+                  Loved by guests with {topRatedFood.rate} positive feedback
+                </p>
+              </div>
+              <div
+                style={{
+                  minWidth: 64,
+                  height: 64,
+                  borderRadius: 16,
+                  background: '#fff',
+                  border: '1px solid var(--border)',
+                  display: 'grid',
+                  placeItems: 'center',
+                  boxShadow: 'var(--shadow-subtle)'
+                }}
+              >
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#e11d48', lineHeight: 1 }}>{topRatedFood.rating.toFixed(1)}</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>/ 5.0</div>
+                </div>
+              </div>
             </div>
+
+            {/* <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 650 }}>Orders</div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2 }}>{topRatedFood.orders}</div>
+              </div>
+              <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 14px' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 650 }}>Revenue</div>
+                <div style={{ fontSize: 16, fontWeight: 800, marginTop: 2, color: 'var(--primary)' }}>{topRatedFood.revenue}</div>
+              </div>
+            </div> */}
           </div>
         </div>
       </div>
@@ -291,7 +311,7 @@ export default function Dashboard() {
                       fontWeight: 700,
                       fontSize: 12
                     }}>
-                      #{d.rank}
+                      {d.rank}
                     </span>
                   </td>
                   <td><strong>{d.name}</strong></td>

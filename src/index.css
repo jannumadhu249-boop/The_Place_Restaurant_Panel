@@ -103,6 +103,27 @@ body {
   z-index: 100;
   overflow-y: auto;
   overflow-x: hidden;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fixed-sidebar.is-collapsed {
+  width: 78px;
+}
+
+.fixed-sidebar.is-collapsed .sidebar-header {
+  justify-content: center;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.fixed-sidebar.is-collapsed .nav-item {
+  justify-content: center;
+  padding: 12px;
+  gap: 0;
+}
+
+.fixed-sidebar.is-collapsed .nav-item:hover {
+  transform: none;
 }
 
 .sidebar-header {
@@ -203,6 +224,33 @@ body {
   flex-direction: column;
   min-width: 0;
   min-height: 100vh;
+  transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-container.sidebar-collapsed .main-wrapper {
+  margin-left: 78px;
+}
+
+.sidebar-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--text-main);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-toggle-btn:hover {
+  background: var(--primary-light);
+  border-color: var(--primary-border);
+  color: var(--primary);
 }
 
 /* Fixed / Sticky Top Header */
@@ -777,3 +825,614 @@ body {
   border: 1px solid var(--border);
   margin-bottom: 16px;
 }
+
+/* ========================================
+   AUTH PAGES — Login & Forgot Password
+   ======================================== */
+
+.auth-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: linear-gradient(135deg, #0c111d 0%, #1a2540 45%, #0f1e38 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Decorative background orbs */
+.auth-wrapper::before,
+.auth-wrapper::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+  opacity: 0.35;
+}
+
+.auth-wrapper::before {
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, #f97316 0%, transparent 70%);
+  top: -140px;
+  right: -120px;
+}
+
+.auth-wrapper::after {
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
+  bottom: -100px;
+  left: -80px;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
+  padding: 40px 36px;
+  box-shadow:
+    0 32px 64px -12px rgba(0, 0, 0, 0.55),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  position: relative;
+  z-index: 1;
+  animation: authFadeIn 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes authFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(22px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.auth-icon-wrap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.22), rgba(249, 115, 22, 0.08));
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  margin-bottom: 16px;
+  box-shadow: 0 8px 24px -4px rgba(249, 115, 22, 0.25);
+}
+
+.auth-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.4px;
+  margin-bottom: 6px;
+}
+
+.auth-sub {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.48);
+  line-height: 1.5;
+}
+
+/* Auth Form Inputs */
+.auth-card .form-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  margin-bottom: 7px;
+  display: block;
+}
+
+.auth-card .form-input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: var(--radius-md);
+  color: #ffffff;
+  font-size: 14px;
+  padding: 11px 14px;
+  width: 100%;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+
+.auth-card .form-input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.auth-card .form-input:focus {
+  border-color: rgba(249, 115, 22, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+}
+
+/* Remember me row */
+.auth-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  user-select: none;
+}
+
+.auth-remember input[type='checkbox'] {
+  accent-color: var(--primary);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.auth-link {
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+  transition: color 0.2s, opacity 0.2s;
+}
+
+.auth-link:hover {
+  color: #fb923c;
+  text-decoration: underline;
+}
+
+/* Auth primary button */
+.auth-card .btn-primary {
+  width: 100%;
+  justify-content: center;
+  padding: 12px 20px;
+  font-size: 14.5px;
+  font-weight: 600;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #f97316, #ea580c);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.2px;
+  box-shadow: 0 4px 16px rgba(249, 115, 22, 0.38);
+  transition: transform 0.18s, box-shadow 0.18s, background 0.18s;
+}
+
+.auth-card .btn-primary:hover {
+  background: linear-gradient(135deg, #fb923c, #f97316);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 22px rgba(249, 115, 22, 0.5);
+}
+
+.auth-card .btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(249, 115, 22, 0.3);
+}
+
+/* Outline button (Back to Login) */
+.auth-card .btn-outline {
+  width: 100%;
+  justify-content: center;
+  padding: 11px 20px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+  text-decoration: none;
+}
+
+.auth-card .btn-outline:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.auth-card .btn-secondary {
+  width: 100%;
+  justify-content: center;
+  padding: 11px 20px;
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: background 0.2s, color 0.2s;
+  text-decoration: none;
+}
+
+.auth-card .btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* Divider */
+.auth-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+/* Footer note */
+.auth-footer {
+  text-align: center;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.38);
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.auth-footer span {
+  color: var(--primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.auth-footer span:hover {
+  color: #fb923c;
+}
+
+/* Success state (Forgot Password) */
+.auth-success {
+  text-align: center;
+  padding: 8px 0 4px;
+}
+
+.auth-success h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 8px;
+}
+
+.auth-success p {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.auth-success b {
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 600;
+}
+
+/* ========================================
+   FORGOT PASSWORD — Multi-step Styles
+   ======================================== */
+
+.fp-card {
+  max-width: 440px;
+}
+
+/* Step transition panel */
+.fp-step-panel {
+  animation: fpSlideIn 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes fpSlideIn {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Step dots ── */
+.fp-step-dots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.fp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: background 0.3s, transform 0.3s, width 0.3s;
+}
+
+.fp-dot-active {
+  background: var(--primary);
+  width: 24px;
+  border-radius: 4px;
+  transform: scale(1);
+}
+
+.fp-dot-done {
+  background: var(--success);
+}
+
+/* ── Email highlight ── */
+.fp-email-highlight {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+/* ── Input with icon ── */
+.fp-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.fp-input-icon {
+  position: absolute;
+  left: 13px;
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.fp-icon-input {
+  padding-left: 38px !important;
+}
+
+.fp-pr-input {
+  padding-right: 42px !important;
+}
+
+.fp-eye-btn {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+
+.fp-eye-btn:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Error border on input */
+.auth-card .form-input.fp-input-error {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+/* Error message */
+.fp-error-msg {
+  font-size: 12px;
+  color: #f87171;
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Match message */
+.fp-match-msg {
+  font-size: 12px;
+  color: var(--success);
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── OTP Boxes ── */
+.fp-otp-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.fp-otp-box {
+  width: 50px;
+  height: 54px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.07);
+  border: 1.5px solid rgba(255, 255, 255, 0.13);
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 700;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s;
+  caret-color: var(--primary);
+}
+
+.fp-otp-box:focus {
+  border-color: rgba(249, 115, 22, 0.7);
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18);
+  transform: scale(1.06);
+}
+
+.fp-otp-box.fp-otp-filled {
+  border-color: rgba(249, 115, 22, 0.45);
+  background: rgba(249, 115, 22, 0.08);
+}
+
+.fp-otp-box.fp-input-error {
+  border-color: rgba(239, 68, 68, 0.6);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+/* ── Resend row ── */
+.fp-resend-row {
+  text-align: center;
+  font-size: 13px;
+}
+
+.fp-resend-timer {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.fp-resend-timer b {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.fp-resend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.fp-resend-btn:hover {
+  color: #fb923c;
+  text-decoration: underline;
+}
+
+/* ── Password strength ── */
+.fp-strength-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.fp-strength-bars {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.fp-strength-bar {
+  flex: 1;
+  height: 4px;
+  border-radius: 99px;
+  transition: background 0.3s;
+}
+
+.fp-strength-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: right;
+}
+
+/* ── Back button ── */
+.fp-back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: color 0.2s;
+  font-family: inherit;
+}
+
+.fp-back-btn:hover {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+/* ── Loading spinner ── */
+.fp-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  display: inline-block;
+  animation: fpSpin 0.7s linear infinite;
+}
+
+@keyframes fpSpin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-card .btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Success panel ── */
+.fp-success-panel {
+  text-align: center;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+}
+
+.fp-success-icon-wrap {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 20px;
+  animation: fpPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes fpPop {
+  from { transform: scale(0.4); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+
+.fp-success-title {
+  font-size: 21px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.3px;
+  margin-bottom: 10px;
+}
+
+.fp-success-sub {
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, 0.48);
+  line-height: 1.6;
+  margin-bottom: 24px;
+  max-width: 300px;
+}
+
+
