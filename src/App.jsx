@@ -65,6 +65,9 @@ import ViewOrder from './pages/OrderManagement/ViewOrder';
 // Service Options
 import DineIn from './pages/ServiceOptions/DineIn';
 import Takeaway from './pages/ServiceOptions/Takeaway';
+import Tables from './pages/ServiceOptions/Tables';
+import Captains from './pages/ServiceOptions/Captains';
+import FloorSections from './pages/ServiceOptions/FloorSections';
 
 // Billing
 import Billing from './pages/BillingSettlement/Billing';
@@ -184,8 +187,14 @@ export default function App() {
           {/* Service Options */}
           <Route path="service/dine-in" element={<DineIn />} />
           <Route path="service/takeaway" element={<Takeaway />} />
+          <Route path="service/tables" element={<Tables />} />
+          <Route path="service/captains" element={<Captains />} />
+          <Route path="service/floor-sections" element={<FloorSections />} />
           <Route path="dine-in" element={<Navigate to="/service/dine-in" replace />} />
           <Route path="takeaway" element={<Navigate to="/service/takeaway" replace />} />
+          <Route path="tables" element={<Navigate to="/service/tables" replace />} />
+          <Route path="captains" element={<Navigate to="/service/captains" replace />} />
+          <Route path="floor-sections" element={<Navigate to="/service/floor-sections" replace />} />
 
           {/* Billing */}
           <Route path="billing" element={<Billing />} />

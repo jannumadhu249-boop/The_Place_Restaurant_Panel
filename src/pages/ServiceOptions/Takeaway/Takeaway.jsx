@@ -8,23 +8,21 @@ import {
   Search,
   Settings2,
   RefreshCw,
-  Bell,
   Phone,
-  X,
-  CreditCard,
-  IndianRupee,
-  Check,
   User,
   Printer,
   Banknote,
   Smartphone,
-  QrCode,
-  Copy,
+  CreditCard,
   Minus,
-  Trash2,
   Utensils,
+  Tag,
+  Check,
 } from 'lucide-react';
-import './ServiceOps.css';
+import '../ServiceOps.css';
+import TakeawayConfigModal from './TakeawayConfigModal';
+import TakeawayBillModal from './TakeawayBillModal';
+import NewTakeawayOrderModal from './NewTakeawayOrderModal';
 
 const INITIAL_QUEUE = [
   { id: 'TKW-2208', guest: 'Aisha Khan', phone: '+91 98765 41200', items: 3, status: 'Ready', eta: 'Now', total: 480, placed: '12:42 PM', slot: '12:55', payment: 'UPI' },
@@ -56,7 +54,11 @@ const MENU_ITEMS = [
 ];
 
 const MENU_CATEGORIES = ['All', ...new Set(MENU_ITEMS.map((m) => m.category))];
-const UPI_ID = 'theplace@upi';
+const AVAILABLE_COUPONS = [
+  { code: 'WELCOME10', type: 'percent', value: 10, label: '10% OFF' },
+  { code: 'FLAT50', type: 'flat', value: 50, label: '₹50 OFF' },
+  { code: 'TAKEAWAY20', type: 'percent', value: 20, label: '20% OFF' },
+];
 
 export default function Takeaway() {
   const [queue, setQueue] = useState(INITIAL_QUEUE);
@@ -72,20 +74,16 @@ export default function Takeaway() {
   const [selectedOrderForBill, setSelectedOrderForBill] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 
-  // Food selection in takeaway order form
+  // Counter form state (inline quick order)
   const [cart, setCart] = useState({});
   const [menuCategory, setMenuCategory] = useState('All');
-  const [menuSearch, setMenuSearch] = useState('');
-
-  // Order Details Form state
   const [orderGuest, setOrderGuest] = useState('');
   const [orderPhone, setOrderPhone] = useState('');
-  const [orderSlot, setOrderSlot] = useState('13:15');
-  const [orderPayMethod, setOrderPayMethod] = useState('Cash'); // 'Cash' | 'UPI' | 'Card'
+  const [orderPayMethod, setOrderPayMethod] = useState('Cash');
   const [orderCashReceived, setOrderCashReceived] = useState('');
-  const [orderUpiRef, setOrderUpiRef] = useState('');
-  const [orderCardAuth, setOrderCardAuth] = useState('');
-  const [orderNotes, setOrderNotes] = useState('');
+  const [couponInput, setCouponInput] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [manualDiscount, setManualDiscount] = useState('');
 
   // Settings state
   const [settings, setSettings] = useState({
@@ -119,12 +117,9 @@ export default function Takeaway() {
 
   const filteredMenu = useMemo(() => {
     return MENU_ITEMS.filter((m) => {
-      const catOk = menuCategory === 'All' || m.category === menuCategory;
-      const q = menuSearch.trim().toLowerCase();
-      const searchOk = !q || m.name.toLowerCase().includes(q);
-      return catOk && searchOk;
+      return menuCategory === 'All' || m.category === menuCategory;
     });
-  }, [menuCategory, menuSearch]);
+  }, [menuCategory]);
 
   const cartItems = useMemo(() => {
     return Object.entries(cart)
@@ -140,10 +135,23 @@ export default function Takeaway() {
     [cartItems]
   );
 
+  const discountAmount = useMemo(() => {
+    let disc = Number(manualDiscount) || 0;
+    if (appliedCoupon) {
+      if (appliedCoupon.type === 'percent') {
+        disc += Math.round((cartSubtotal * appliedCoupon.value) / 100);
+      } else {
+        disc += appliedCoupon.value;
+      }
+    }
+    return Math.min(disc, cartSubtotal);
+  }, [appliedCoupon, manualDiscount, cartSubtotal]);
+
   const cartTotal = useMemo(() => {
     if (cartItems.length === 0) return 0;
-    return cartSubtotal + (settings.packingFee || 0);
-  }, [cartSubtotal, cartItems.length, settings.packingFee]);
+    const base = Math.max(0, cartSubtotal - discountAmount);
+    return base + (settings.packingFee || 0);
+  }, [cartSubtotal, discountAmount, cartItems.length, settings.packingFee]);
 
   const stats = useMemo(() => {
     const ready = queue.filter((o) => o.status === 'Ready').length;
@@ -158,7 +166,7 @@ export default function Takeaway() {
   }, [queue, history]);
 
   const money = (n) =>
-    n.toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+    `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
   const avatarColor = (status) => {
     if (status === 'Ready') return { bg: '#ecfdf5', color: '#059669' };
@@ -188,7 +196,20 @@ export default function Takeaway() {
     });
   };
 
-  // Create Takeaway Order with selected food & payment
+  const handleApplyCoupon = (codeToApply) => {
+    const code = (codeToApply || couponInput).trim().toUpperCase();
+    if (!code) return;
+    const found = AVAILABLE_COUPONS.find((c) => c.code === code);
+    if (!found) {
+      alert(`Invalid coupon "${code}".`);
+      return;
+    }
+    setAppliedCoupon(found);
+    setCouponInput(code);
+    showToast(`✓ Coupon ${code} applied successfully!`);
+  };
+
+  // Create Takeaway Order from Inline Right Card
   const handleCreateOrder = (e) => {
     if (e) e.preventDefault();
     if (!orderGuest.trim()) {
@@ -211,24 +232,55 @@ export default function Takeaway() {
       itemsList: cartItems,
       status: 'Queued',
       eta: `${settings.prepMins} min`,
+      subtotal: cartSubtotal,
+      discount: discountAmount,
+      coupon: appliedCoupon ? appliedCoupon.code : null,
       total: cartTotal,
       placed: nowTime,
-      slot: orderSlot,
+      slot: '13:15',
       payment: orderPayMethod,
-      notes: orderNotes,
     };
 
     setQueue((prev) => [newOrder, ...prev]);
-    setIsNewOrderModalOpen(false);
 
     // Reset Form
     setOrderGuest('');
     setOrderPhone('');
-    setOrderNotes('');
     setCart({});
     setOrderCashReceived('');
+    setAppliedCoupon(null);
+    setCouponInput('');
+    setManualDiscount('');
 
     showToast(`✓ Takeaway order ${newId} created for ${newOrder.guest} (${money(cartTotal)})! Paid via ${orderPayMethod}.`);
+  };
+
+  // Create Takeaway Order from Modal
+  const handleModalCreateOrder = (orderData) => {
+    const newId = `TKW-${2200 + queue.length + history.length + 1}`;
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const newOrder = {
+      id: newId,
+      guest: orderData.guest,
+      phone: orderData.phone,
+      items: orderData.cartItems.reduce((s, i) => s + i.qty, 0),
+      itemsList: orderData.cartItems,
+      status: 'Queued',
+      eta: `${settings.prepMins} min`,
+      subtotal: orderData.subtotal,
+      discount: orderData.discountAmount,
+      coupon: orderData.coupon,
+      total: orderData.total,
+      placed: nowTime,
+      slot: orderData.slot,
+      payment: orderData.payMethod,
+      notes: orderData.notes,
+    };
+
+    setQueue((prev) => [newOrder, ...prev]);
+    setIsNewOrderModalOpen(false);
+    showToast(`✓ Takeaway order ${newId} placed for ${newOrder.guest} (${money(orderData.total)})!`);
   };
 
   // Open Bill / Receipt Modal for an order in Queue
@@ -242,7 +294,7 @@ export default function Takeaway() {
     setQueue((prev) =>
       prev.map((o) => (o.id === orderId ? { ...o, status: 'Ready', eta: 'Now' } : o))
     );
-    showToast(`✓ Order ${orderId} marked Ready for Pickup! Customer notified via SMS.`);
+    showToast(`✓ Order ${orderId} marked Ready for Pickup! Customer notified.`);
   };
 
   // Handover order
@@ -273,21 +325,21 @@ export default function Takeaway() {
             <ShoppingBag size={22} color="var(--primary)" /> Takeaway
           </h1>
           <p className="page-desc">
-            Pickup queue, prep slots, packing charges, and customer notifications
+            Pickup queue, prep slots, packing charges, and customer orders
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
             <RefreshCw size={15} /> Refresh
           </button>
-          <button
+          {/* <button
             type="button"
             className="btn btn-outline"
             onClick={() => setIsConfigModalOpen(true)}
             title="Takeaway Configuration & Rules"
           >
             <Settings2 size={15} /> Takeaway Configuration
-          </button>
+          </button> */}
           <button
             type="button"
             className="btn btn-primary"
@@ -457,15 +509,6 @@ export default function Takeaway() {
                         <Package size={14} /> Hand Over
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="btn btn-outline"
-                      style={{ fontSize: 12, padding: '6px 10px' }}
-                      onClick={() => showToast(`✓ Notification sent to ${o.guest} (${o.phone})!`)}
-                      title="Notify customer"
-                    >
-                      <Bell size={13} />
-                    </button>
                   </div>
                 </div>
               );
@@ -543,7 +586,7 @@ export default function Takeaway() {
                 ))}
               </div>
 
-              {/* Menu items list (compact) */}
+              {/* Menu items list */}
               <div className="svc-menu-grid" style={{ maxHeight: 220, marginBottom: 12 }}>
                 {filteredMenu.slice(0, 6).map((item) => {
                   const qty = cart[item.id] || 0;
@@ -583,6 +626,82 @@ export default function Takeaway() {
                 })}
               </div>
 
+              {/* Coupon & Discount Section */}
+              <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 750, color: '#334155', marginBottom: 8 }}>
+                  <Tag size={14} color="var(--primary)" /> Apply Coupon / Discount
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Coupon code (e.g. WELCOME10)"
+                    value={couponInput}
+                    onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                    style={{ textTransform: 'uppercase', fontSize: 12 }}
+                  />
+                  {appliedCoupon ? (
+                    <button
+                      type="button"
+                      className="btn btn-outline"
+                      style={{ fontSize: 12, padding: '0 12px', color: '#ef4444', borderColor: '#fca5a5' }}
+                      onClick={() => {
+                        setAppliedCoupon(null);
+                        setCouponInput('');
+                      }}
+                    >
+                      Remove
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn-primary"
+                      style={{ fontSize: 12, padding: '0 14px' }}
+                      onClick={() => handleApplyCoupon()}
+                    >
+                      Apply
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {AVAILABLE_COUPONS.map((cpn) => (
+                    <button
+                      key={cpn.code}
+                      type="button"
+                      onClick={() => handleApplyCoupon(cpn.code)}
+                      style={{
+                        fontSize: 11,
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        border: appliedCoupon?.code === cpn.code ? '1.5px solid var(--primary)' : '1px dashed #cbd5e1',
+                        background: appliedCoupon?.code === cpn.code ? '#fff7ed' : '#ffffff',
+                        color: appliedCoupon?.code === cpn.code ? 'var(--primary)' : '#475569',
+                        fontWeight: 650,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {cpn.code} ({cpn.label})
+                    </button>
+                  ))}
+                </div>
+
+                <div className="form-group" style={{ marginBottom: 0 }}>
+                  <label className="form-label" style={{ fontSize: 12, marginBottom: 4 }}>
+                    Custom Manual Discount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    className="form-control"
+                    placeholder="0"
+                    value={manualDiscount}
+                    onChange={(e) => setManualDiscount(e.target.value)}
+                    style={{ fontSize: 12, height: 34 }}
+                  />
+                </div>
+              </div>
+
               {/* Cart Summary */}
               {cartItems.length > 0 && (
                 <div style={{ background: '#f8fafc', padding: 12, borderRadius: 10, border: '1px solid #e2e8f0', marginBottom: 14 }}>
@@ -590,6 +709,12 @@ export default function Takeaway() {
                     <span style={{ color: '#64748b' }}>Food Subtotal:</span>
                     <strong>{money(cartSubtotal)}</strong>
                   </div>
+                  {discountAmount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4, color: '#059669', fontWeight: 650 }}>
+                      <span>Discount {appliedCoupon ? `(${appliedCoupon.code})` : ''}:</span>
+                      <strong>- {money(discountAmount)}</strong>
+                    </div>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
                     <span style={{ color: '#64748b' }}>Packing Fee:</span>
                     <strong>{money(settings.packingFee)}</strong>
@@ -631,7 +756,7 @@ export default function Takeaway() {
                 </button>
               </div>
 
-              {/* Dynamic tender details */}
+              {/* Dynamic tender details: Cash active */}
               {orderPayMethod === 'Cash' && (
                 <div style={{ background: '#f8fafc', padding: 10, borderRadius: 10, border: '1px solid #e2e8f0' }}>
                   <div className="form-group">
@@ -651,36 +776,6 @@ export default function Takeaway() {
                   )}
                 </div>
               )}
-
-              {orderPayMethod === 'UPI' && (
-                <div style={{ background: '#f8fafc', padding: 10, borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <QrCode size={40} style={{ opacity: 0.8 }} />
-                    <div style={{ fontSize: 12 }}>
-                      <div>Pay via QR or ID: <strong>{UPI_ID}</strong></div>
-                      <input
-                        className="form-control"
-                        style={{ height: 32, fontSize: 12, marginTop: 4 }}
-                        placeholder="Optional UPI UTR No."
-                        value={orderUpiRef}
-                        onChange={(e) => setOrderUpiRef(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {orderPayMethod === 'Card' && (
-                <div style={{ background: '#f8fafc', padding: 10, borderRadius: 10, border: '1px solid #e2e8f0' }}>
-                  <input
-                    className="form-control"
-                    style={{ height: 36, fontSize: 12 }}
-                    placeholder="POS Auth / Approval Code"
-                    value={orderCardAuth}
-                    onChange={(e) => setOrderCardAuth(e.target.value)}
-                  />
-                </div>
-              )}
             </div>
 
             <button
@@ -689,7 +784,7 @@ export default function Takeaway() {
               disabled={!enabled || cartItems.length === 0}
               style={{ width: '100%', justifyContent: 'center' }}
             >
-              <Plus size={16} /> Place Takeaway Order & Generate Bill ({money(cartTotal)})
+              <Plus size={16} /> Place Takeaway Order & Settle ({money(cartTotal)})
             </button>
           </form>
         </div>
@@ -734,439 +829,41 @@ export default function Takeaway() {
       </div>
 
       {/* ══════════════════════════════════════════════
-          MODAL: TAKEAWAY CONFIGURATION (POPUP)
+          MODALS (SEPARATED COMPONENTS)
       ══════════════════════════════════════════════ */}
-      {isConfigModalOpen && (
-        <div className="svc-modal-overlay" onClick={() => setIsConfigModalOpen(false)}>
-          <div className="svc-modal-card wide" onClick={(e) => e.stopPropagation()}>
-            <div className="svc-modal-header">
-              <div className="svc-modal-title">
-                <Settings2 size={20} color="var(--primary)" /> Takeaway Configuration
-              </div>
-              <button
-                type="button"
-                className="svc-modal-close-btn"
-                onClick={() => setIsConfigModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <TakeawayConfigModal
+        isOpen={isConfigModalOpen}
+        onClose={() => setIsConfigModalOpen(false)}
+        settings={settings}
+        onUpdateSetting={updateSetting}
+        onSaveConfig={() => {
+          setIsConfigModalOpen(false);
+          showToast('✓ Takeaway configuration saved successfully!');
+        }}
+      />
 
-            <div className="svc-modal-body">
-              <div className="svc-settings-group">
-                <div className="svc-settings-group-title">
-                  <Clock3 size={15} color="var(--primary)" /> Prep Timing & Capacity
-                </div>
-                <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  <div className="form-group">
-                    <label className="form-label">Default preparation time</label>
-                    <div className="svc-input-group">
-                      <input
-                        type="number"
-                        min={5}
-                        className="form-control"
-                        value={settings.prepMins}
-                        onChange={(e) => updateSetting('prepMins', Number(e.target.value))}
-                      />
-                      <span className="svc-input-addon">mins</span>
-                    </div>
-                  </div>
+      <TakeawayBillModal
+        isOpen={isBillModalOpen}
+        onClose={() => setIsBillModalOpen(false)}
+        order={selectedOrderForBill}
+        packingFee={settings.packingFee}
+        money={money}
+        onPrint={() => {
+          showToast('Printing takeaway invoice…');
+          setTimeout(() => window.print(), 300);
+        }}
+      />
 
-                  <div className="form-group">
-                    <label className="form-label">Slot time interval</label>
-                    <div className="svc-input-group">
-                      <input
-                        type="number"
-                        min={5}
-                        className="form-control"
-                        value={settings.slotInterval}
-                        onChange={(e) => updateSetting('slotInterval', Number(e.target.value))}
-                      />
-                      <span className="svc-input-addon">mins</span>
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Max orders per slot</label>
-                    <input
-                      type="number"
-                      min={1}
-                      className="form-control"
-                      value={settings.maxOrdersPerSlot}
-                      onChange={(e) => updateSetting('maxOrdersPerSlot', Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="svc-settings-group">
-                <div className="svc-settings-group-title">
-                  <IndianRupee size={15} color="var(--primary)" /> Charges & Payment Policy
-                </div>
-                <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  <div className="form-group">
-                    <label className="form-label">Packaging fee</label>
-                    <div className="svc-input-group">
-                      <input
-                        type="number"
-                        min={0}
-                        className="form-control"
-                        value={settings.packingFee}
-                        onChange={(e) => updateSetting('packingFee', Number(e.target.value))}
-                      />
-                      <span className="svc-input-addon">₹</span>
-                    </div>
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Require prepaid orders</label>
-                    <select
-                      className="form-control"
-                      value={settings.requirePrepaid ? 'yes' : 'no'}
-                      onChange={(e) => updateSetting('requirePrepaid', e.target.value === 'yes')}
-                    >
-                      <option value="no">No, allow pay at counter</option>
-                      <option value="yes">Yes, mandatory prepaid</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="svc-settings-group">
-                <div className="svc-settings-group-title">
-                  <Bell size={15} color="var(--primary)" /> Notifications
-                </div>
-                <div className="form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
-                  <div className="form-group">
-                    <label className="form-label">Send SMS alert when ready</label>
-                    <select
-                      className="form-control"
-                      value={settings.notifySms ? 'yes' : 'no'}
-                      onChange={(e) => updateSetting('notifySms', e.target.value === 'yes')}
-                    >
-                      <option value="yes">Yes, send SMS</option>
-                      <option value="no">Disabled</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Send App push notification</label>
-                    <select
-                      className="form-control"
-                      value={settings.notifyPush ? 'yes' : 'no'}
-                      onChange={(e) => updateSetting('notifyPush', e.target.value === 'yes')}
-                    >
-                      <option value="yes">Yes, send Push</option>
-                      <option value="no">Disabled</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="svc-modal-footer">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setIsConfigModalOpen(false)}
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  setIsConfigModalOpen(false);
-                  showToast('✓ Takeaway configuration saved successfully!');
-                }}
-              >
-                <CheckCircle2 size={16} /> Save Configuration
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════
-          MODAL: NEW TAKEAWAY ORDER WITH MENU & PAYMENT
-      ══════════════════════════════════════════════ */}
-      {isNewOrderModalOpen && (
-        <div className="svc-modal-overlay" onClick={() => setIsNewOrderModalOpen(false)}>
-          <div className="svc-modal-card extra-wide" onClick={(e) => e.stopPropagation()}>
-            <div className="svc-modal-header">
-              <div className="svc-modal-title">
-                <ShoppingBag size={20} color="var(--primary)" /> New Takeaway Order & Menu
-              </div>
-              <button
-                type="button"
-                className="svc-modal-close-btn"
-                onClick={() => setIsNewOrderModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateOrder}>
-              <div className="svc-modal-body">
-                <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 20 }}>
-                  {/* Left: Food Selection */}
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 750, color: '#0f172a', marginBottom: 10 }}>
-                      <Utensils size={15} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--primary)' }} />
-                      Select Dishes & Drinks
-                    </div>
-
-                    <div className="svc-input-with-icon" style={{ marginBottom: 12 }}>
-                      <Search size={15} className="svc-input-icon" />
-                      <input
-                        className="form-control"
-                        placeholder="Search menu items…"
-                        value={menuSearch}
-                        onChange={(e) => setMenuSearch(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="svc-menu-cats">
-                      {MENU_CATEGORIES.map((c) => (
-                        <button
-                          key={c}
-                          type="button"
-                          className={`svc-menu-cat-btn ${menuCategory === c ? 'active' : ''}`}
-                          onClick={() => setMenuCategory(c)}
-                        >
-                          {c}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="svc-menu-grid" style={{ maxHeight: 320 }}>
-                      {filteredMenu.map((item) => {
-                        const qty = cart[item.id] || 0;
-                        return (
-                          <div key={item.id} className="svc-menu-item">
-                            <div className="svc-menu-item-top">
-                              <div>
-                                <div className="svc-menu-item-name">{item.name}</div>
-                                <div className="svc-menu-item-cat">{item.category}</div>
-                              </div>
-                              <div className="svc-menu-item-price">{money(item.price)}</div>
-                            </div>
-                            <div className="svc-menu-item-qty">
-                              {qty === 0 ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-primary"
-                                  style={{ fontSize: 12, padding: '5px 12px', width: '100%', justifyContent: 'center' }}
-                                  onClick={() => changeQty(item.id, 1)}
-                                >
-                                  <Plus size={13} /> Add
-                                </button>
-                              ) : (
-                                <div className="svc-qty-ctrl">
-                                  <button type="button" className="svc-qty-btn" onClick={() => changeQty(item.id, -1)}>
-                                    <Minus size={13} />
-                                  </button>
-                                  <span className="svc-qty-val">{qty}</span>
-                                  <button type="button" className="svc-qty-btn add" onClick={() => changeQty(item.id, 1)}>
-                                    <Plus size={13} />
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Right: Customer & Checkout Info */}
-                  <div style={{ background: '#f8fafc', padding: 18, borderRadius: 14, border: '1.5px solid #e2e8f0' }}>
-                    <div style={{ fontSize: 14, fontWeight: 750, color: '#0f172a', marginBottom: 12 }}>
-                      Customer & Payment
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 12 }}>
-                      <label className="form-label">Customer Name *</label>
-                      <input
-                        className="form-control"
-                        placeholder="e.g. Aisha Khan"
-                        value={orderGuest}
-                        onChange={(e) => setOrderGuest(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 12 }}>
-                      <label className="form-label">Phone Number</label>
-                      <input
-                        className="form-control"
-                        placeholder="+91 …"
-                        value={orderPhone}
-                        onChange={(e) => setOrderPhone(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ marginBottom: 14 }}>
-                      <label className="form-label">Pickup Slot</label>
-                      <select
-                        className="form-control"
-                        value={orderSlot}
-                        onChange={(e) => setOrderSlot(e.target.value)}
-                      >
-                        <option>12:45</option>
-                        <option>12:55</option>
-                        <option>13:05</option>
-                        <option>13:15</option>
-                        <option>13:30</option>
-                      </select>
-                    </div>
-
-                    {/* Order summary */}
-                    <div style={{ background: '#ffffff', padding: 12, borderRadius: 10, border: '1px solid #cbd5e1', marginBottom: 14 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                        <span style={{ color: '#64748b' }}>Items Subtotal:</span>
-                        <strong>{money(cartSubtotal)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 6 }}>
-                        <span style={{ color: '#64748b' }}>Packing Fee:</span>
-                        <strong>{money(settings.packingFee)}</strong>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, fontWeight: 800, borderTop: '1px dashed #cbd5e1', paddingTop: 6 }}>
-                        <span>Total Due:</span>
-                        <strong style={{ color: 'var(--primary)' }}>{money(cartTotal)}</strong>
-                      </div>
-                    </div>
-
-                    {/* Payment Mode */}
-                    <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Payment Tender</label>
-                    <div className="svc-checkout-tender-tabs" style={{ marginBottom: 10 }}>
-                      <button
-                        type="button"
-                        className={`svc-checkout-tender-btn ${orderPayMethod === 'Cash' ? 'active' : ''}`}
-                        onClick={() => setOrderPayMethod('Cash')}
-                      >
-                        <Banknote size={15} /> Cash
-                      </button>
-                      <button
-                        type="button"
-                        className={`svc-checkout-tender-btn ${orderPayMethod === 'UPI' ? 'active' : ''}`}
-                        onClick={() => setOrderPayMethod('UPI')}
-                      >
-                        <Smartphone size={15} /> UPI
-                      </button>
-                      <button
-                        type="button"
-                        className={`svc-checkout-tender-btn ${orderPayMethod === 'Card' ? 'active' : ''}`}
-                        onClick={() => setOrderPayMethod('Card')}
-                      >
-                        <CreditCard size={15} /> Card
-                      </button>
-                    </div>
-
-                    {orderPayMethod === 'Cash' && (
-                      <div className="form-group" style={{ marginBottom: 8 }}>
-                        <input
-                          type="number"
-                          className="form-control"
-                          placeholder="Cash tendered (₹)"
-                          value={orderCashReceived}
-                          onChange={(e) => setOrderCashReceived(e.target.value)}
-                        />
-                      </div>
-                    )}
-                    {orderPayMethod === 'UPI' && (
-                      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>
-                        UPI ID: <strong>{UPI_ID}</strong>
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      className="btn btn-primary"
-                      disabled={cartItems.length === 0}
-                      style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
-                    >
-                      <CheckCircle2 size={16} /> Place Order & Generate Bill ({money(cartTotal)})
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ══════════════════════════════════════════════
-          MODAL: VIEW & PRINT TAKEAWAY BILL
-      ══════════════════════════════════════════════ */}
-      {isBillModalOpen && selectedOrderForBill && (
-        <div className="svc-modal-overlay" onClick={() => setIsBillModalOpen(false)}>
-          <div className="svc-modal-card" onClick={(e) => e.stopPropagation()}>
-            <div className="svc-modal-header">
-              <div className="svc-modal-title">
-                <Printer size={20} color="var(--primary)" /> Takeaway Receipt — {selectedOrderForBill.id}
-              </div>
-              <button
-                type="button"
-                className="svc-modal-close-btn"
-                onClick={() => setIsBillModalOpen(false)}
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="svc-modal-body">
-              <div className="svc-bill-preview">
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 12, opacity: 0.8 }}>TAKEAWAY INVOICE</div>
-                    <div style={{ fontSize: 18, fontWeight: 800 }}>{selectedOrderForBill.id}</div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 14, fontWeight: 700 }}>{selectedOrderForBill.guest}</div>
-                    <div style={{ fontSize: 12, opacity: 0.8 }}>Slot: {selectedOrderForBill.slot}</div>
-                  </div>
-                </div>
-
-                <div className="svc-bill-row">
-                  <span>Order Items ({selectedOrderForBill.items})</span>
-                  <strong>{money(selectedOrderForBill.total - (settings.packingFee || 15))}</strong>
-                </div>
-                <div className="svc-bill-row">
-                  <span>Packaging Charges</span>
-                  <strong>{money(settings.packingFee || 15)}</strong>
-                </div>
-                <div className="svc-bill-row total">
-                  <span>Total Paid</span>
-                  <strong>{money(selectedOrderForBill.total)}</strong>
-                </div>
-                <div style={{ fontSize: 12, marginTop: 10, opacity: 0.85 }}>
-                  Payment Method: <strong>{selectedOrderForBill.payment}</strong>
-                </div>
-              </div>
-            </div>
-
-            <div className="svc-modal-footer">
-              <button
-                type="button"
-                className="btn btn-outline"
-                onClick={() => setIsBillModalOpen(false)}
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => {
-                  showToast('Printing takeaway invoice…');
-                  setTimeout(() => window.print(), 300);
-                }}
-              >
-                <Printer size={15} /> Print Receipt
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NewTakeawayOrderModal
+        isOpen={isNewOrderModalOpen}
+        onClose={() => setIsNewOrderModalOpen(false)}
+        menuItems={MENU_ITEMS}
+        menuCategories={MENU_CATEGORIES}
+        availableCoupons={AVAILABLE_COUPONS}
+        packingFee={settings.packingFee}
+        money={money}
+        onSubmitOrder={handleModalCreateOrder}
+      />
 
       {/* Toast Feedback */}
       {toastMessage && (
@@ -1177,3 +874,4 @@ export default function Takeaway() {
     </div>
   );
 }
+

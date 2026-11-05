@@ -15,7 +15,10 @@ import {
   ArrowLeftRight,
   Pizza,
   Armchair,
-  ShoppingBag
+  ShoppingBag,
+  LayoutGrid,
+  UserCheck,
+  MapPin,
 } from 'lucide-react';
 import Header from './Header';
 
@@ -38,6 +41,9 @@ export default function Layout({ onLogout }) {
     { section: 'Service Options' },
     { to: '/service/dine-in', label: 'Dine-in', icon: Armchair },
     { to: '/service/takeaway', label: 'Takeaway', icon: ShoppingBag },
+    { to: '/service/tables', label: 'Tables', icon: LayoutGrid },
+    { to: '/service/floor-sections', label: 'Floor Sections', icon: MapPin },
+    { to: '/service/captains', label: 'Captains & Servers', icon: UserCheck },
 
     { section: 'Billing' },
     { to: '/billing', label: 'Billing', icon: Receipt },
