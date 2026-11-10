@@ -11,7 +11,10 @@ import {
   Smartphone,
   CreditCard,
   Tag,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
+import { URLS } from '../../../url';
 
 export default function NewTakeawayOrderModal({
   isOpen,
@@ -21,11 +24,10 @@ export default function NewTakeawayOrderModal({
   availableCoupons = [],
   packingFee = 15,
   money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`,
-  onSubmitOrder,
+  onOrderSuccess,
 }) {
   const [guest, setGuest] = useState('');
   const [phone, setPhone] = useState('');
-  const [slot, setSlot] = useState('12:55');
   const [payMethod, setPayMethod] = useState('Cash');
   const [cashReceived, setCashReceived] = useState('');
   const [notes, setNotes] = useState('');
@@ -40,11 +42,14 @@ export default function NewTakeawayOrderModal({
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [manualDiscount, setManualDiscount] = useState('');
 
+  // Submission state
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+
   useEffect(() => {
     if (isOpen) {
       setGuest('');
       setPhone('');
-      setSlot('12:55');
       setPayMethod('Cash');
       setCashReceived('');
       setNotes('');
@@ -54,14 +59,26 @@ export default function NewTakeawayOrderModal({
       setCouponInput('');
       setAppliedCoupon(null);
       setManualDiscount('');
+      setIsSubmitting(false);
+      setSubmitError('');
     }
   }, [isOpen]);
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    const hasToken = token && token !== 'undefined' && token !== 'null' && token.trim() !== '';
+    return {
+      'Content-Type': 'application/json',
+      ...(hasToken ? { Authorization: `Bearer ${token.trim()}` } : {}),
+    };
+  };
 
   const filteredMenu = useMemo(() => {
     return menuItems.filter((m) => {
       const catOk = category === 'All' || m.category === category;
       const q = search.trim().toLowerCase();
-      const searchOk = !q || m.name.toLowerCase().includes(q);
+      const itemName = (m.dishName || m.name || '').toLowerCase();
+      const searchOk = !q || itemName.includes(q);
       return catOk && searchOk;
     });
   }, [menuItems, category, search]);
@@ -70,8 +87,18 @@ export default function NewTakeawayOrderModal({
     return Object.entries(cart)
       .filter(([, qty]) => qty > 0)
       .map(([id, qty]) => {
-        const item = menuItems.find((m) => m.id === id);
-        return { ...item, qty, subtotal: item.price * qty };
+        const item = menuItems.find((m) => m.id === id || m._id === id);
+        return {
+          ...item,
+          productId: item?._id || item?.id || id,
+          id: item?.id || id,
+          _id: item?._id || id,
+          name: item?.dishName || item?.name || 'Dish',
+          dishName: item?.dishName || item?.name || 'Dish',
+          price: Number(item?.price || 0),
+          qty,
+          subtotal: Number(item?.price || 0) * qty,
+        };
       });
   }, [cart, menuItems]);
 
@@ -124,29 +151,112 @@ export default function NewTakeawayOrderModal({
     setCouponInput(code);
   };
 
-  const handleSubmit = (e) => {
+  // Direct backend create order API call (POST /v1/place/restaurant/takeaway/orders)
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!guest.trim()) {
-      alert('Please enter customer name');
-      return;
-    }
-    if (cartItems.length === 0) {
-      alert('Please select at least 1 food item for the takeaway order.');
+    setSubmitError('');
+
+    // Customer Name is Optional (default to 'Guest')
+    const customerName = guest.trim() || 'Guest';
+
+    // 10-digit Phone Validation
+    const cleanPhone = phone.replace(/\D/g, '');
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setSubmitError('Please enter a valid 10-digit customer phone number.');
       return;
     }
 
-    onSubmitOrder({
-      guest: guest.trim(),
-      phone: phone.trim() || '+91 98xxx 00000',
-      slot,
-      payMethod,
-      cartItems,
-      subtotal,
-      discountAmount,
-      coupon: appliedCoupon ? appliedCoupon.code : null,
-      total,
-      notes,
-    });
+    if (cartItems.length === 0) {
+      setSubmitError('Please select at least 1 food item for the takeaway order.');
+      return;
+    }
+
+    // Payment validation: Cash requires sufficient tender if filled
+    if (payMethod === 'Cash' && cashReceived && Number(cashReceived) < total) {
+      setSubmitError(`Cash received (${money(cashReceived)}) is less than total due (${money(total)}).`);
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const payload = {
+        customerName,
+        customerPhone: cleanPhone,
+        items: cartItems.map((item) => ({
+          productId: item.productId || item._id || item.id,
+          quantity: Number(item.qty || 1),
+        })),
+        pickupSlot: 'Immediate',
+        paymentMethod: (payMethod || 'cash').toLowerCase(),
+        notes: notes.trim() || (appliedCoupon ? `Coupon: ${appliedCoupon.code}` : 'Takeaway Order'),
+      };
+
+      const res = await fetch(URLS.CreateTakeaway, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+
+      if (res.ok && (result.success || result.status)) {
+        const createdOrder = result.data || result.order || {};
+        const orderId = createdOrder._id || result._id;
+
+        // If paid with UPI or Card, record the payment transaction
+        if (orderId && (payMethod === 'UPI' || payMethod === 'Card')) {
+          try {
+            await fetch(`${URLS.UpdateTakeawayPayment}${orderId}/payment`, {
+              method: 'PUT',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ transactionId: `${payMethod}-${Date.now()}` }),
+            });
+          } catch (payErr) {
+            console.warn('Payment update warning:', payErr);
+          }
+        }
+
+        const formattedOrderForBill = {
+          id: createdOrder.orderNumber || (orderId ? `TKW-${orderId.slice(-4).toUpperCase()}` : 'TKW-NEW'),
+          mongoId: orderId,
+          _id: orderId,
+          guest: customerName,
+          phone: cleanPhone,
+          slot: 'Immediate',
+          status: 'Queued',
+          items: cartItems.reduce((s, it) => s + Number(it.qty || 1), 0),
+          itemsList: cartItems.map((it) => ({
+            name: it.dishName || it.name,
+            dishName: it.dishName || it.name,
+            qty: it.qty,
+            price: it.price,
+            subtotal: it.subtotal,
+          })),
+          subtotal,
+          discount: discountAmount,
+          coupon: appliedCoupon ? appliedCoupon.code : null,
+          total,
+          payment: payMethod,
+          paymentStatus: 'Paid',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        };
+
+        if (onOrderSuccess) {
+          onOrderSuccess(result, formattedOrderForBill);
+        }
+
+        onClose();
+      } else {
+        const errMsg = result.message || 'Failed to place takeaway order. Please check inputs.';
+        setSubmitError(errMsg);
+      }
+    } catch (err) {
+      console.error('Error placing modal order:', err);
+      setSubmitError('Network error while placing order. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -167,6 +277,24 @@ export default function NewTakeawayOrderModal({
 
         <form onSubmit={handleSubmit}>
           <div className="svc-modal-body">
+            {submitError && (
+              <div style={{
+                background: '#fef2f2',
+                border: '1px solid #fca5a5',
+                color: '#b91c1c',
+                padding: '10px 14px',
+                borderRadius: 8,
+                marginBottom: 14,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                fontSize: 13,
+              }}>
+                <AlertCircle size={16} />
+                <span>{submitError}</span>
+              </div>
+            )}
+
             <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: 20 }}>
               {/* Left: Food Selection */}
               <div>
@@ -179,13 +307,14 @@ export default function NewTakeawayOrderModal({
                   <Search size={15} className="svc-input-icon" />
                   <input
                     className="form-control"
-                    placeholder="Search menu items…"
+                    placeholder="Search dishes by name…"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                   />
                 </div>
 
-                <div className="svc-menu-cats">
+                {/* Display All Categories */}
+                <div className="svc-menu-cats" style={{ flexWrap: 'wrap', gap: 6 }}>
                   {menuCategories.map((c) => (
                     <button
                       key={c}
@@ -200,12 +329,15 @@ export default function NewTakeawayOrderModal({
 
                 <div className="svc-menu-grid" style={{ maxHeight: 320 }}>
                   {filteredMenu.map((item) => {
-                    const qty = cart[item.id] || 0;
+                    const itemId = item._id || item.id;
+                    const qty = cart[itemId] || 0;
+                    const displayName = item.dishName || item.name || 'Dish';
+
                     return (
-                      <div key={item.id} className="svc-menu-item">
+                      <div key={itemId} className="svc-menu-item">
                         <div className="svc-menu-item-top">
                           <div>
-                            <div className="svc-menu-item-name">{item.name}</div>
+                            <div className="svc-menu-item-name">{displayName}</div>
                             <div className="svc-menu-item-cat">{item.category}</div>
                           </div>
                           <div className="svc-menu-item-price">{money(item.price)}</div>
@@ -216,17 +348,17 @@ export default function NewTakeawayOrderModal({
                               type="button"
                               className="btn btn-primary"
                               style={{ fontSize: 12, padding: '5px 12px', width: '100%', justifyContent: 'center' }}
-                              onClick={() => changeQty(item.id, 1)}
+                              onClick={() => changeQty(itemId, 1)}
                             >
                               <Plus size={13} /> Add
                             </button>
                           ) : (
                             <div className="svc-qty-ctrl">
-                              <button type="button" className="svc-qty-btn" onClick={() => changeQty(item.id, -1)}>
+                              <button type="button" className="svc-qty-btn" onClick={() => changeQty(itemId, -1)}>
                                 <Minus size={13} />
                               </button>
                               <span className="svc-qty-val">{qty}</span>
-                              <button type="button" className="svc-qty-btn add" onClick={() => changeQty(item.id, 1)}>
+                              <button type="button" className="svc-qty-btn add" onClick={() => changeQty(itemId, 1)}>
                                 <Plus size={13} />
                               </button>
                             </div>
@@ -235,6 +367,11 @@ export default function NewTakeawayOrderModal({
                       </div>
                     );
                   })}
+                  {filteredMenu.length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', padding: 24, textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                      No dishes found in category &quot;{category}&quot;.
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -244,40 +381,34 @@ export default function NewTakeawayOrderModal({
                   Customer & Payment
                 </div>
 
+                {/* Optional Customer Name */}
                 <div className="form-group" style={{ marginBottom: 12 }}>
                   <label className="form-label">Customer Name</label>
                   <input
                     className="form-control"
-                    placeholder="e.g. Aisha Khan"
+                    placeholder="e.g. Aisha Khan (or leave blank for Guest)"
                     value={guest}
                     onChange={(e) => setGuest(e.target.value)}
-                    // required
                   />
                 </div>
 
-                <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label className="form-label">Phone Number</label>
-                  <input
-                    className="form-control"
-                    placeholder="+91 …"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                </div>
-
+                {/* 10-Digit Mobile Phone */}
                 <div className="form-group" style={{ marginBottom: 14 }}>
-                  <label className="form-label">Pickup Slot</label>
-                  <select
+                  <label className="form-label">Phone Number *</label>
+                  <input
+                    type="tel"
                     className="form-control"
-                    value={slot}
-                    onChange={(e) => setSlot(e.target.value)}
-                  >
-                    <option>12:45</option>
-                    <option>12:55</option>
-                    <option>13:05</option>
-                    <option>13:15</option>
-                    <option>13:30</option>
-                  </select>
+                    placeholder="10-digit mobile number"
+                    value={phone}
+                    maxLength={10}
+                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    required
+                  />
+                  {/* {phone && phone.length !== 10 && (
+                    <div style={{ fontSize: 11, color: '#ea580c', marginTop: 4 }}>
+                      {10 - phone.length} more digits required
+                    </div>
+                  )} */}
                 </div>
 
                 {/* Coupon & Discount Section */}
@@ -376,7 +507,7 @@ export default function NewTakeawayOrderModal({
                 </div>
 
                 {/* Payment Mode */}
-                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Payment Tender</label>
+                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Payment Tender *</label>
                 <div className="svc-checkout-tender-tabs" style={{ marginBottom: 10 }}>
                   <button
                     type="button"
@@ -401,28 +532,51 @@ export default function NewTakeawayOrderModal({
                   </button>
                 </div>
 
-                {/* Dynamic tender details: Cash active, UPI & Card commented out */}
                 {payMethod === 'Cash' && (
                   <div className="form-group" style={{ marginBottom: 8 }}>
                     <input
                       type="number"
                       className="form-control"
-                      placeholder="Cash tendered (₹)"
+                      placeholder={`Cash tendered (₹, total is ${money(total)})`}
                       value={cashReceived}
                       onChange={(e) => setCashReceived(e.target.value)}
                     />
+                    {Number(cashReceived) > 0 && total > 0 && (
+                      <div style={{ fontSize: 11.5, marginTop: 4, color: Number(cashReceived) >= total ? '#059669' : '#dc2626', fontWeight: 650 }}>
+                        {Number(cashReceived) >= total
+                          ? `Change to return: ${money(Number(cashReceived) - total)}`
+                          : `Insufficient cash (${money(total - Number(cashReceived))} more required)`}
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* UPI & Card payment option fields commented out per instruction */}
+                <div className="form-group" style={{ marginBottom: 8 }}>
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Notes (e.g. Please pack carefully)"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    style={{ fontSize: 12 }}
+                  />
+                </div>
 
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={cartItems.length === 0}
+                  disabled={cartItems.length === 0 || isSubmitting}
                   style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
                 >
-                  <CheckCircle2 size={16} /> Place Order & Generate Bill ({money(total)})
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw size={15} className="spin" /> Placing Order & Settling...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} /> Place Takeaway Order & Settle ({money(total)})
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -432,4 +586,3 @@ export default function NewTakeawayOrderModal({
     </div>
   );
 }
-

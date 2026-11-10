@@ -19,6 +19,7 @@ import {
   LayoutGrid,
   UserCheck,
   MapPin,
+  Ticket,
 } from 'lucide-react';
 import Header from './Header';
 
@@ -43,7 +44,7 @@ export default function Layout({ onLogout }) {
     { to: '/service/takeaway', label: 'Takeaway', icon: ShoppingBag },
     { to: '/service/tables', label: 'Tables', icon: LayoutGrid },
     { to: '/service/floor-sections', label: 'Floor Sections', icon: MapPin },
-    { to: '/service/captains', label: 'Captains & Servers', icon: UserCheck },
+    { to: '/service/captains', label: 'Servers', icon: UserCheck },
 
     { section: 'Billing' },
     { to: '/billing', label: 'Billing', icon: Receipt },
@@ -56,6 +57,7 @@ export default function Layout({ onLogout }) {
     { section: 'Marketing & Sales' },
     { to: '/reviews', label: 'Customer Reviews', icon: Star },
     { to: '/my-wallet', label: 'My Wallet', icon: Wallet },
+    { to: '/coupons', label: 'Coupons', icon: Ticket},
 
     { section: 'Reports Management' },
     { to: '/reports/order', label: 'Order Report', icon: FileBarChart },

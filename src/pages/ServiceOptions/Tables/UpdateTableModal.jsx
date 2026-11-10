@@ -6,21 +6,21 @@ export default function UpdateTableModal({
   onClose,
   table,
   onSaveTable,
-  sections = ['Main Hall', 'Patio', 'Private', 'Bar'],
-  captains = ['Ananya', 'Vikram', 'Meera', 'Unassigned'],
+  sections = [],
+  captains = [],
 }) {
-  const [section, setSection] = useState('Main Hall');
+  const [section, setSection] = useState('');
   const [seats, setSeats] = useState(4);
-  const [captain, setCaptain] = useState('Ananya');
+  const [captain, setCaptain] = useState('Unassigned');
   const [status, setStatus] = useState('available');
   const [shape, setShape] = useState('Square');
   const [minSpend, setMinSpend] = useState(0);
 
   useEffect(() => {
     if (table) {
-      setSection(table.section || sections[0] || 'Main Hall');
+      setSection(table.section || (sections.length > 0 ? sections[0] : ''));
       setSeats(table.seats || 4);
-      setCaptain(table.captain || captains[0] || 'Unassigned');
+      setCaptain(table.captain || (captains.length > 0 ? captains[0] : 'Unassigned'));
       setStatus(table.status || 'available');
       setShape(table.shape || 'Square');
       setMinSpend(table.minSpend || 0);

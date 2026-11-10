@@ -46,4 +46,50 @@ export const URLS = {
     //Customer Reviews
     GetReviews: base_url + "v1/place/app/review/restaurant/",
 
+    //Floor Sections
+    GetFloorSectionsCards: base_url + "v1/place/restaurant/floor-sections/dashboard",
+    GetFloorSections: base_url + "v1/place/restaurant/floor-sections",
+    GetActiveFloorSections: base_url + "v1/place/restaurant/dine-in/sessions/active",
+    CreateFloorSections: base_url + "v1/place/restaurant/floor-sections/add",
+    GetByIdFloorSections: base_url + "v1/place/restaurant/floor-sections/",
+    UpdateFloorSections: base_url + "v1/place/restaurant/floor-sections/",
+    UpdateStatusFloorSection: base_url + "v1/place/restaurant/floor-sections/",
+    DeleteFloorSections: base_url + "v1/place/restaurant/floor-sections/",
+
+    //Tables
+    GetTableCards: base_url + "v1/place/restaurant/tables-management/dashboard",
+    GetTables: base_url + "v1/place/restaurant/tables-management/tables",
+    CreateTables: base_url + "v1/place/restaurant/tables-management/tables/add",
+    UpdateTables: base_url + "v1/place/restaurant/tables-management/tables/",
+    UpdateTableStatus: base_url + "v1/place/restaurant/tables-management/tables/",
+    AssignCaptainTable: base_url + "v1/place/restaurant/tables-management/tables/",
+    DeleteTables: base_url + "v1/place/restaurant/tables-management/tables/",
+
+    //Servers
+    GetServerCards: base_url + "v1/place/restaurant/floor-staff/dashboard",
+    GetActiveServers: base_url + "v1/place/restaurant/floor-staff/active-captains",
+    GetServers: base_url + "v1/place/restaurant/floor-staff",
+    CreateServers: base_url + "v1/place/restaurant/floor-staff/add",
+    UpdateServers: base_url + "v1/place/restaurant/floor-staff/",
+    UpdateStatusServer: base_url + "v1/place/restaurant/floor-staff/",
+    DeleteServers: base_url + "v1/place/restaurant/floor-staff/",
+
+    //Takeaway
+    EnableTakeaway: base_url + "v1/place/restaurant/takeaway/service-status",
+    GetTakeawayCards: base_url + "v1/place/restaurant/takeaway/dashboard/summary",
+    GetTakeaway: base_url + "v1/place/restaurant/takeaway/orders",
+    CreateTakeaway: base_url + "v1/place/restaurant/takeaway/orders",
+    UpdateTakeaway: base_url + "v1/place/restaurant/takeaway/orders/",
+    UpdateTakeawayStatus: base_url + "v1/place/restaurant/takeaway/orders/",
+    UpdateTakeawayPayment: base_url + "v1/place/restaurant/takeaway/orders/",
+    GetInvoice: base_url + "v1/place/restaurant/takeaway/orders/",
+
+    //Coupons
+    GetActiveCoupons: base_url + "v1/place/admin/coupon/get-active",
+    GetCoupons: base_url + "v1/place/admin/coupon/getAll",
+    CreateCoupon: base_url + "v1/place/admin/coupon/add",
+    UpdateCoupon: base_url + "v1/place/admin/coupon/edit/",
+    DeleteCoupon: base_url + "v1/place/admin/coupon/delete/",
+
+
 }

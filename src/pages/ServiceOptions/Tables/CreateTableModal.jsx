@@ -1,21 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, X, CheckCircle2, Armchair } from 'lucide-react';
 
 export default function CreateTableModal({
   isOpen,
   onClose,
   onAddTable,
-  sections = ['Main Hall', 'Patio', 'Private', 'Bar'],
-  captains = ['Ananya', 'Vikram', 'Meera', 'Unassigned'],
+  sections = [],
+  captains = [],
   existingTableIds = [],
 }) {
   const [tableNo, setTableNo] = useState('');
-  const [section, setSection] = useState(sections[0] || 'Main Hall');
+  const [section, setSection] = useState('');
   const [seats, setSeats] = useState(4);
-  const [captain, setCaptain] = useState(captains[0] || 'Ananya');
+  const [captain, setCaptain] = useState('Unassigned');
   const [status, setStatus] = useState('available');
   const [shape, setShape] = useState('Square');
   const [minSpend, setMinSpend] = useState(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (sections.length > 0 && (!section || !sections.includes(section))) {
+        setSection(sections[0]);
+      }
+      if (captains.length > 0 && (!captain || !captains.includes(captain))) {
+        setCaptain(captains[0]);
+      }
+    }
+  }, [isOpen, sections, captains]);
 
   if (!isOpen) return null;
 
@@ -82,9 +93,13 @@ export default function CreateTableModal({
                     onChange={(e) => setSection(e.target.value)}
                     required
                   >
-                    {sections.map((s) => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
+                    {sections.length === 0 ? (
+                      <option value="">-- No Sections Created Yet --</option>
+                    ) : (
+                      sections.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))
+                    )}
                   </select>
                 </div>
 

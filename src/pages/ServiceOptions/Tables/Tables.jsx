@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   LayoutGrid,
   Armchair,
@@ -16,54 +16,205 @@ import {
   Grid,
 } from 'lucide-react';
 import '../ServiceOps.css';
+import { URLS } from '../../../url';
 import CreateTableModal from './CreateTableModal';
 import UpdateTableModal from './UpdateTableModal';
 
-const INITIAL_TABLES = [
-  { id: 'T01', section: 'Main Hall', seats: 2, status: 'available', captain: 'Ananya', shape: 'Square', minSpend: 0 },
-  { id: 'T02', section: 'Main Hall', seats: 4, status: 'occupied', captain: 'Vikram', guest: 'Rahul S.', covers: 3, shape: 'Square', minSpend: 0 },
-  { id: 'T03', section: 'Main Hall', seats: 4, status: 'reserved', captain: 'Meera', guest: 'Priya P.', covers: 4, shape: 'Round', minSpend: 0 },
-  { id: 'T04', section: 'Main Hall', seats: 6, status: 'cleaning', captain: 'Ananya', shape: 'Rectangle', minSpend: 0 },
-  { id: 'T05', section: 'Patio', seats: 2, status: 'available', captain: 'Vikram', shape: 'Square', minSpend: 0 },
-  { id: 'T06', section: 'Patio', seats: 4, status: 'occupied', captain: 'Vikram', guest: 'Emma W.', covers: 2, shape: 'Square', minSpend: 0 },
-  { id: 'T07', section: 'Patio', seats: 4, status: 'available', captain: 'Meera', shape: 'Square', minSpend: 0 },
-  { id: 'T08', section: 'Private', seats: 8, status: 'reserved', captain: 'Ananya', guest: 'Corp Dinner', covers: 8, shape: 'Rectangle', minSpend: 2500 },
-  { id: 'T09', section: 'Bar', seats: 2, status: 'occupied', captain: 'Meera', guest: 'James L.', covers: 1, shape: 'Round', minSpend: 0 },
-  { id: 'T10', section: 'Bar', seats: 2, status: 'available', captain: 'Ananya', shape: 'Round', minSpend: 0 },
-  { id: 'T11', section: 'Main Hall', seats: 4, status: 'available', captain: 'Vikram', shape: 'Square', minSpend: 0 },
-  { id: 'T12', section: 'Main Hall', seats: 6, status: 'occupied', captain: 'Meera', guest: 'Sophie T.', covers: 5, shape: 'Rectangle', minSpend: 0 },
-];
-
-const SECTIONS = ['Main Hall', 'Patio', 'Private', 'Bar'];
-const CAPTAINS = ['Ananya', 'Vikram', 'Meera', 'Unassigned'];
-
 export default function Tables() {
-  const [tables, setTables] = useState(INITIAL_TABLES);
+  const [tables, setTables] = useState([]);
+  const [sectionsList, setSectionsList] = useState([]);
+  const [captainsList, setCaptainsList] = useState([]);
   const [search, setSearch] = useState('');
   const [sectionFilter, setSectionFilter] = useState('All');
   const [statusFilter, setStatusFilter] = useState('All');
   const [viewMode, setViewMode] = useState('grid'); // 'grid' | 'table'
+  const [isLoading, setIsLoading] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [toast, setToast] = useState({ message: '', type: 'success' });
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState(null);
-  const [toastMessage, setToastMessage] = useState('');
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3500);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast({ message: '', type: 'success' }), 3500);
   };
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    const hasToken = token && token !== 'undefined' && token !== 'null' && token.trim() !== '';
+    return {
+      'Content-Type': 'application/json',
+      ...(hasToken ? { Authorization: `Bearer ${token.trim()}` } : {}),
+    };
+  };
+
+  // Section names list for dropdowns
+  const availableSections = useMemo(() => {
+    return sectionsList.map((s) => s.sectionName || s.name || '').filter(Boolean);
+  }, [sectionsList]);
+
+  // Captain names list for dropdowns
+  const availableCaptains = useMemo(() => {
+    const names = captainsList.map((c) => c.name || '').filter(Boolean);
+    return [...names, 'Unassigned'];
+  }, [captainsList]);
+
+  // Fetch Sections (to resolve sectionId)
+  const fetchSectionsData = useCallback(async () => {
+    try {
+      const res = await fetch(`${URLS.GetFloorSections}?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        let list = [];
+        if (Array.isArray(data.data)) list = data.data;
+        else if (Array.isArray(data.sections)) list = data.sections;
+        else if (Array.isArray(data.data?.sections)) list = data.data.sections;
+        else if (Array.isArray(data.data?.docs)) list = data.data.docs;
+        else if (Array.isArray(data)) list = data;
+
+        setSectionsList(list);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch sections for table dropdown:', err);
+    }
+  }, []);
+
+  // Fetch Captains (to resolve captainId)
+  const fetchCaptainsData = useCallback(async () => {
+    try {
+      const res = await fetch(URLS.GetActiveServers, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        let list = [];
+        if (Array.isArray(data.data)) list = data.data;
+        else if (Array.isArray(data.captains)) list = data.captains;
+        else if (Array.isArray(data.staff)) list = data.staff;
+        else if (Array.isArray(data)) list = data;
+
+        if (list.length > 0) {
+          setCaptainsList(list);
+          return;
+        }
+      }
+
+      // Fallback to GetServers
+      const res2 = await fetch(`${URLS.GetServers}?page=1&limit=100`, {
+        headers: getAuthHeaders(),
+      });
+      if (res2.ok) {
+        const data2 = await res2.json();
+        let list2 = [];
+        if (Array.isArray(data2.data)) list2 = data2.data;
+        else if (Array.isArray(data2.staff)) list2 = data2.staff;
+        else if (Array.isArray(data2.data?.docs)) list2 = data2.data.docs;
+        else if (Array.isArray(data2)) list2 = data2;
+        setCaptainsList(list2);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch staff list for tables:', err);
+    }
+  }, []);
+
+  // Fetch Table Dashboard Stats
+  const fetchTableDashboard = useCallback(async () => {
+    try {
+      const res = await fetch(URLS.GetTableCards, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.success || data.status || data.data)) {
+          setDashboardStats(data.data || data);
+        }
+      }
+    } catch (err) {
+      console.warn('Table dashboard fetch warning:', err);
+    }
+  }, []);
+
+  // Fetch Tables List
+  const fetchTables = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const queryParams = new URLSearchParams();
+      if (search.trim()) queryParams.append('search', search.trim());
+      if (statusFilter !== 'All') queryParams.append('status', statusFilter.toLowerCase());
+
+      const url = `${URLS.GetTables}${queryParams.toString() ? '?' + queryParams.toString() : ''}`;
+      const res = await fetch(url, { headers: getAuthHeaders() });
+      const result = await res.json();
+
+      let rawTables = [];
+      if (Array.isArray(result.data)) rawTables = result.data;
+      else if (Array.isArray(result.tables)) rawTables = result.tables;
+      else if (Array.isArray(result.data?.tables)) rawTables = result.data.tables;
+      else if (Array.isArray(result.data?.docs)) rawTables = result.data.docs;
+      else if (Array.isArray(result.docs)) rawTables = result.docs;
+      else if (Array.isArray(result)) rawTables = result;
+
+      const mapped = rawTables.map((t, idx) => {
+        const secName =
+          t.sectionId && typeof t.sectionId === 'object' && t.sectionId.sectionName
+            ? t.sectionId.sectionName
+            : t.sectionName || t.section || 'General';
+
+        const capName =
+          t.captainId && typeof t.captainId === 'object' && t.captainId.name
+            ? t.captainId.name
+            : t.assignedCaptain && typeof t.assignedCaptain === 'object' && t.assignedCaptain.name
+            ? t.assignedCaptain.name
+            : t.captain || 'Unassigned';
+
+        return {
+          id: t.tableNumber || t.tableName || `T${String(idx + 1).padStart(2, '0')}`,
+          mongoId: t._id,
+          sectionId: t.sectionId && typeof t.sectionId === 'object' ? t.sectionId._id : t.sectionId,
+          section: secName,
+          seats: Number(t.seatingCapacity || t.capacity || t.seats || 4),
+          status: (t.status || 'available').toLowerCase(),
+          captain: capName,
+          captainId: t.captainId && typeof t.captainId === 'object' ? t.captainId._id : t.captainId,
+          shape: t.tableType ? t.tableType.charAt(0).toUpperCase() + t.tableType.slice(1) : 'Square',
+          minSpend: Number(t.minSpend || 0),
+          guest: t.currentGuest || t.guest || '',
+          covers: Number(t.covers || 0),
+          raw: t,
+        };
+      });
+
+      setTables(mapped);
+    } catch (err) {
+      console.error('Tables fetch error:', err);
+      showToast('Unable to load tables. Please check your connection.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [search, statusFilter]);
+
+  // Initial load
+  useEffect(() => {
+    fetchSectionsData();
+    fetchCaptainsData();
+    fetchTableDashboard();
+    fetchTables();
+  }, [fetchSectionsData, fetchCaptainsData, fetchTableDashboard, fetchTables]);
 
   const filteredTables = useMemo(() => {
     return tables.filter((t) => {
-      const matchSection = sectionFilter === 'All' || t.section === sectionFilter;
-      const matchStatus = statusFilter === 'All' || t.status === statusFilter;
+      const matchSection = sectionFilter === 'All' || (t.section || '').toLowerCase() === sectionFilter.toLowerCase();
+      const matchStatus = statusFilter === 'All' || (t.status || '').toLowerCase() === statusFilter.toLowerCase();
       const q = search.trim().toLowerCase();
       const matchSearch =
         !q ||
-        t.id.toLowerCase().includes(q) ||
-        t.section.toLowerCase().includes(q) ||
+        (t.id || '').toLowerCase().includes(q) ||
+        (t.section || '').toLowerCase().includes(q) ||
         (t.captain || '').toLowerCase().includes(q) ||
         (t.guest || '').toLowerCase().includes(q);
       return matchSection && matchStatus && matchSearch;
@@ -71,12 +222,20 @@ export default function Tables() {
   }, [tables, sectionFilter, statusFilter, search]);
 
   const stats = useMemo(() => {
+    if (dashboardStats) {
+      return {
+        total: Number(dashboardStats.totalTables ?? dashboardStats.total ?? tables.length),
+        available: Number(dashboardStats.availableTables ?? dashboardStats.available ?? tables.filter((t) => t.status === 'available').length),
+        occupied: Number(dashboardStats.occupiedTables ?? dashboardStats.occupied ?? tables.filter((t) => t.status === 'occupied').length),
+        reserved: Number(dashboardStats.reservedTables ?? dashboardStats.reserved ?? tables.filter((t) => t.status === 'reserved').length),
+      };
+    }
     const total = tables.length;
     const available = tables.filter((t) => t.status === 'available').length;
     const occupied = tables.filter((t) => t.status === 'occupied').length;
     const reserved = tables.filter((t) => t.status === 'reserved').length;
     return { total, available, occupied, reserved };
-  }, [tables]);
+  }, [tables, dashboardStats]);
 
   const statusBadge = (s) => {
     if (s === 'available') return 'badge-success';
@@ -85,10 +244,69 @@ export default function Tables() {
     return 'badge-muted';
   };
 
-  // Add Table
-  const handleAddTable = (newTable) => {
-    setTables((prev) => [...prev, newTable]);
-    showToast(`✓ Table ${newTable.id} added successfully to ${newTable.section}!`);
+  // Add Table (POST /add)
+  const handleAddTable = async (newTable) => {
+    try {
+      // Resolve sectionId
+      let resolvedSecId = '';
+      const matchedSection = sectionsList.find(
+        (s) => (s.sectionName || s.name || '').toLowerCase() === (newTable.section || '').toLowerCase()
+      );
+      if (matchedSection) {
+        resolvedSecId = matchedSection._id;
+      } else if (sectionsList.length > 0 && sectionsList[0]._id) {
+        resolvedSecId = sectionsList[0]._id;
+      }
+
+      if (!resolvedSecId) {
+        showToast('Please create a floor section first before adding tables.', 'error');
+        return;
+      }
+
+      // Resolve captainId if assigned
+      const matchedCaptain = captainsList.find(
+        (c) => (c.name || '').toLowerCase() === (newTable.captain || '').toLowerCase()
+      );
+
+      const payload = {
+        tableNumber: newTable.id,
+        sectionId: resolvedSecId,
+        seatingCapacity: Number(newTable.seats) || 4,
+        status: (newTable.status || 'available').toLowerCase(),
+        tableType: (newTable.shape || 'standard').toLowerCase() === 'bar' ? 'bar' : 'standard',
+      };
+
+      const res = await fetch(URLS.CreateTables, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+
+      if (res.ok && (result.success || result.status)) {
+        const createdId = result.data?._id || result._id;
+        // If captain assigned, trigger assignment API
+        if (createdId && matchedCaptain?._id) {
+          try {
+            await fetch(`${URLS.AssignCaptainTable}${createdId}/assignment`, {
+              method: 'PUT',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ captainId: matchedCaptain._id }),
+            });
+          } catch (e) {
+            console.warn('Captain assignment warning:', e);
+          }
+        }
+        showToast(`✓ Table ${newTable.id} added successfully!`);
+        fetchTables();
+        fetchTableDashboard();
+      } else {
+        showToast(result.message || 'Failed to add table. Please check input.', 'error');
+      }
+    } catch (err) {
+      console.error('Error adding table:', err);
+      showToast('Network error while adding table.', 'error');
+    }
   };
 
   // Open Edit Modal
@@ -97,36 +315,112 @@ export default function Tables() {
     setIsEditModalOpen(true);
   };
 
-  // Save Edit Table
-  const handleSaveEditTable = (updatedTable) => {
-    setTables((prev) =>
-      prev.map((t) => (t.id === updatedTable.id ? { ...t, ...updatedTable } : t))
-    );
-    showToast(`✓ Table ${updatedTable.id} updated successfully!`);
+  // Save Edit Table (PUT /:id, status, assignment)
+  const handleSaveEditTable = async (updatedTable) => {
+    try {
+      const targetId = updatedTable.mongoId || updatedTable.id;
+
+      // Find sectionId
+      let resolvedSecId = updatedTable.sectionId;
+      if (!resolvedSecId) {
+        const matchSec = sectionsList.find(
+          (s) => (s.sectionName || s.name || '').toLowerCase() === (updatedTable.section || '').toLowerCase()
+        );
+        resolvedSecId = matchSec?._id;
+      }
+
+      const payload = {
+        tableName: updatedTable.id,
+        tableNumber: updatedTable.id,
+        ...(resolvedSecId ? { sectionId: resolvedSecId } : {}),
+        tableType: (updatedTable.shape || 'standard').toLowerCase() === 'bar' ? 'bar' : 'standard',
+        seatingCapacity: Number(updatedTable.seats) || 4,
+        description: `${updatedTable.seats}-seater dining table`,
+        displayOrder: 1,
+      };
+
+      const res = await fetch(`${URLS.UpdateTables}${targetId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+
+      // Also update status if modified
+      if (updatedTable.status) {
+        try {
+          await fetch(`${URLS.UpdateTableStatus}${targetId}/status`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ status: updatedTable.status.toLowerCase() }),
+          });
+        } catch (e) {
+          console.warn('Status update warning:', e);
+        }
+      }
+
+      // Also assign captain if changed
+      if (updatedTable.captain && updatedTable.captain !== 'Unassigned') {
+        const matchCap = captainsList.find(
+          (c) => (c.name || '').toLowerCase() === updatedTable.captain.toLowerCase()
+        );
+        if (matchCap?._id) {
+          try {
+            await fetch(`${URLS.AssignCaptainTable}${targetId}/assignment`, {
+              method: 'PUT',
+              headers: getAuthHeaders(),
+              body: JSON.stringify({ captainId: matchCap._id }),
+            });
+          } catch (e) {
+            console.warn('Captain assignment warning:', e);
+          }
+        }
+      }
+
+      if (res.ok && (result.success || result.status)) {
+        showToast(`✓ Table ${updatedTable.id} updated successfully!`);
+        fetchTables();
+        fetchTableDashboard();
+      } else {
+        showToast(result.message || 'Failed to update table.', 'error');
+      }
+    } catch (err) {
+      console.error('Error updating table:', err);
+      showToast('Network error while updating table.', 'error');
+    }
   };
 
-  // Delete Table (with occupancy check)
-  const handleDeleteTable = (tableId) => {
-    const table = tables.find((t) => t.id === tableId);
+  // Delete Table (DELETE /:id)
+  const handleDeleteTable = async (tableId) => {
+    const table = tables.find((t) => t.id === tableId || t.mongoId === tableId);
     if (!table) return;
 
     if (table.status === 'occupied') {
-      alert(`Cannot delete Table ${tableId} because it is currently OCCUPIED by guests.`);
+      alert(`Cannot delete Table ${table.id} because it is currently OCCUPIED by guests.`);
       return;
     }
 
-    if (window.confirm(`Are you sure you want to permanently delete Table ${tableId} (${table.section})?`)) {
-      setTables((prev) => prev.filter((t) => t.id !== tableId));
-      showToast(`✓ Table ${tableId} deleted.`);
-    }
-  };
+    if (window.confirm(`Are you sure you want to permanently delete Table ${table.id} (${table.section})?`)) {
+      try {
+        const targetId = table.mongoId || table.id;
+        const res = await fetch(`${URLS.DeleteTables}${targetId}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        });
+        const result = await res.json();
 
-  // Quick Status Toggle
-  const handleStatusChange = (tableId, nextStatus) => {
-    setTables((prev) =>
-      prev.map((t) => (t.id === tableId ? { ...t, status: nextStatus } : t))
-    );
-    showToast(`✓ Table ${tableId} marked as ${nextStatus}.`);
+        if (res.ok && (result.success || result.status)) {
+          showToast(`✓ Table ${table.id} deleted.`);
+          fetchTables();
+          fetchTableDashboard();
+        } else {
+          showToast(result.message || 'Failed to delete table.', 'error');
+        }
+      } catch (err) {
+        console.error('Error deleting table:', err);
+        showToast('Network error while deleting table.', 'error');
+      }
+    }
   };
 
   return (
@@ -142,8 +436,18 @@ export default function Tables() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
-            <RefreshCw size={15} /> Refresh
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => {
+              fetchTables();
+              fetchTableDashboard();
+              fetchSectionsData();
+              fetchCaptainsData();
+              showToast('Refreshed tables data');
+            }}
+          >
+            <RefreshCw size={15} className={isLoading ? 'spin' : ''} /> Refresh
           </button>
           <button
             type="button"
@@ -216,7 +520,7 @@ export default function Tables() {
               onChange={(e) => setSectionFilter(e.target.value)}
             >
               <option value="All">All Sections</option>
-              {SECTIONS.map((s) => (
+              {availableSections.map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -254,6 +558,14 @@ export default function Tables() {
             </button>
           </div>
         </div>
+
+        {/* Loading Spinner */}
+        {isLoading && tables.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+            <RefreshCw size={24} className="spin" style={{ marginBottom: 8 }} />
+            <div>Loading tables...</div>
+          </div>
+        )}
 
         {/* ══════════════════════════════════════════════
             GRID VIEW
@@ -381,22 +693,22 @@ export default function Tables() {
           </div>
         )}
 
-        {filteredTables.length === 0 && (
+        {!isLoading && filteredTables.length === 0 && (
           <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
-            No tables found matching your search criteria.
+            {tables.length === 0 ? 'No tables found. Click "+ Add Table" to add your first floor table.' : 'No tables found matching your search criteria.'}
           </div>
         )}
       </div>
 
       {/* ══════════════════════════════════════════════
-          MODALS (SEPARATED COMPONENTS)
+          MODALS
       ══════════════════════════════════════════════ */}
       <CreateTableModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddTable={handleAddTable}
-        sections={SECTIONS}
-        captains={CAPTAINS}
+        sections={availableSections}
+        captains={availableCaptains}
         existingTableIds={tables.map((t) => t.id)}
       />
 
@@ -408,17 +720,17 @@ export default function Tables() {
         }}
         table={editingTable}
         onSaveTable={handleSaveEditTable}
-        sections={SECTIONS}
-        captains={CAPTAINS}
+        sections={availableSections}
+        captains={availableCaptains}
       />
 
       {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="svc-toast success">
-          <CheckCircle2 size={18} /> {toastMessage}
+      {toast.message && (
+        <div className={`svc-toast ${toast.type}`}>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+          <span>{toast.message}</span>
         </div>
       )}
     </div>
   );
 }
-

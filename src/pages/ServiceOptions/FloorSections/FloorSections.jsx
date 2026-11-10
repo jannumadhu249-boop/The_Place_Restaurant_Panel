@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   LayoutGrid,
   Plus,
@@ -6,6 +6,7 @@ import {
   Edit2,
   Trash2,
   CheckCircle2,
+  AlertCircle,
   Search,
   MapPin,
   Armchair,
@@ -18,59 +19,11 @@ import {
   Wine,
   CloudSun,
   Building2,
-  Check,
 } from 'lucide-react';
 import '../ServiceOps.css';
+import { URLS } from '../../../url';
 import CreateSectionModal from './CreateSectionModal';
 import UpdateSectionModal from './UpdateSectionModal';
-
-const INITIAL_SECTIONS = [
-  {
-    id: 'SEC-01',
-    name: 'Main Hall',
-    description: 'Main indoor dining area — primary seating zone for families & guests',
-    capacity: 60,
-    tableCount: 7,
-    isActive: true,
-    floorLevel: 'Ground Floor',
-  },
-  {
-    id: 'SEC-02',
-    name: 'Patio',
-    description: 'Outdoor garden terrace — fresh open-air dining with scenic views',
-    capacity: 24,
-    tableCount: 3,
-    isActive: true,
-    floorLevel: 'Ground Floor',
-  },
-  {
-    id: 'SEC-03',
-    name: 'Private Dining',
-    description: 'Exclusive private dining hall for VIP guests, parties & corporate dinners',
-    capacity: 16,
-    tableCount: 2,
-    isActive: true,
-    floorLevel: 'Ground Floor',
-  },
-  {
-    id: 'SEC-04',
-    name: 'Bar',
-    description: 'High-top counter and lounge seating for handcrafted drinks & appetizers',
-    capacity: 12,
-    tableCount: 2,
-    isActive: true,
-    floorLevel: 'Ground Floor',
-  },
-  {
-    id: 'SEC-05',
-    name: 'Rooftop Lounge',
-    description: 'Elevated rooftop terrace venue with evening skyline ambiance',
-    capacity: 30,
-    tableCount: 6,
-    isActive: false,
-    floorLevel: 'Rooftop',
-  },
-];
 
 // Aesthetic theme styling mapping for each section type
 const SECTION_THEMES = {
@@ -120,20 +73,96 @@ const DEFAULT_THEME = {
 };
 
 export default function FloorSections() {
-  const [sections, setSections] = useState(INITIAL_SECTIONS);
+  const [sections, setSections] = useState([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [toastMessage, setToastMessage] = useState('');
+  const [toast, setToast] = useState({ message: '', type: 'success' });
+  const [isLoading, setIsLoading] = useState(false);
+  const [dashboardStats, setDashboardStats] = useState(null);
 
   // Modals state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSection, setEditingSection] = useState(null);
 
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 3200);
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast({ message: '', type: 'success' }), 3500);
   };
+
+  // Helper to get auth headers
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    const hasToken = token && token !== 'undefined' && token !== 'null' && token.trim() !== '';
+    return {
+      'Content-Type': 'application/json',
+      ...(hasToken ? { Authorization: `Bearer ${token.trim()}` } : {}),
+    };
+  };
+
+  // 1. Fetch Dashboard Stats
+  const fetchDashboardStats = useCallback(async () => {
+    try {
+      const res = await fetch(URLS.GetFloorSectionsCards, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.success || data.status || data.data)) {
+          setDashboardStats(data.data || data);
+        }
+      }
+    } catch (err) {
+      console.warn('Dashboard stats fetch failed:', err);
+    }
+  }, []);
+
+  // 2. Fetch Floor Sections List
+  const fetchSections = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const queryParams = new URLSearchParams({ page: '1', limit: '50' });
+      if (search.trim()) queryParams.append('search', search.trim());
+      if (statusFilter !== 'All') queryParams.append('status', statusFilter.toLowerCase());
+
+      const res = await fetch(`${URLS.GetFloorSections}?${queryParams.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      const result = await res.json();
+
+      let rawList = [];
+      if (Array.isArray(result.data)) rawList = result.data;
+      else if (Array.isArray(result.sections)) rawList = result.sections;
+      else if (Array.isArray(result.data?.sections)) rawList = result.data.sections;
+      else if (Array.isArray(result.data?.docs)) rawList = result.data.docs;
+      else if (Array.isArray(result.docs)) rawList = result.docs;
+      else if (Array.isArray(result)) rawList = result;
+
+      const mapped = rawList.map((item, idx) => ({
+        id: item.sectionCode || (item._id ? `SEC-${item._id.slice(-4).toUpperCase()}` : `SEC-0${idx + 1}`),
+        mongoId: item._id,
+        name: item.sectionName || item.name || 'Unnamed Section',
+        description: item.description || '',
+        capacity: Number(item.maxSeats || item.capacity || 0),
+        tableCount: Number(item.tableCount || item.tablesCount || item.totalTables || 0),
+        isActive: item.status ? String(item.status).toLowerCase() === 'active' : true,
+        floorLevel: item.floor || item.floorLevel || 'Ground Floor',
+      }));
+
+      setSections(mapped);
+    } catch (err) {
+      console.error('Sections list fetch failed:', err);
+      showToast('Unable to connect to server. Please check connection.', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [search, statusFilter]);
+
+  // Initial load
+  useEffect(() => {
+    fetchDashboardStats();
+    fetchSections();
+  }, [fetchDashboardStats, fetchSections]);
 
   // Filtered list
   const filtered = useMemo(() => {
@@ -145,62 +174,154 @@ export default function FloorSections() {
       const q = search.trim().toLowerCase();
       const matchSearch =
         !q ||
-        s.name.toLowerCase().includes(q) ||
+        (s.name || '').toLowerCase().includes(q) ||
         (s.description || '').toLowerCase().includes(q) ||
-        s.floorLevel.toLowerCase().includes(q);
+        (s.floorLevel || '').toLowerCase().includes(q);
       return matchStatus && matchSearch;
     });
   }, [sections, search, statusFilter]);
 
-  const stats = useMemo(() => ({
-    total: sections.length,
-    active: sections.filter((s) => s.isActive).length,
-    totalCapacity: sections.filter((s) => s.isActive).reduce((sum, s) => sum + Number(s.capacity), 0),
-    totalTables: sections.filter((s) => s.isActive).reduce((sum, s) => sum + Number(s.tableCount), 0),
-  }), [sections]);
+  const stats = useMemo(() => {
+    if (dashboardStats) {
+      return {
+        total: Number(dashboardStats.totalSections ?? sections.length),
+        active: Number(dashboardStats.activeSections ?? sections.filter((s) => s.isActive).length),
+        totalCapacity: Number(dashboardStats.totalCapacity ?? sections.filter((s) => s.isActive).reduce((sum, s) => sum + Number(s.capacity || 0), 0)),
+        totalTables: Number(dashboardStats.activeTables ?? dashboardStats.totalTables ?? sections.filter((s) => s.isActive).reduce((sum, s) => sum + Number(s.tableCount || 0), 0)),
+      };
+    }
+    return {
+      total: sections.length,
+      active: sections.filter((s) => s.isActive).length,
+      totalCapacity: sections.filter((s) => s.isActive).reduce((sum, s) => sum + Number(s.capacity || 0), 0),
+      totalTables: sections.filter((s) => s.isActive).reduce((sum, s) => sum + Number(s.tableCount || 0), 0),
+    };
+  }, [sections, dashboardStats]);
 
-  // Add Section
-  const handleAddSection = (newSec) => {
-    const newId = `SEC-0${sections.length + 1}`;
-    setSections((prev) => [...prev, { id: newId, ...newSec }]);
-    showToast(`✓ Section "${newSec.name}" created successfully!`);
+  // Add Section (POST)
+  const handleAddSection = async (newSec) => {
+    try {
+      const payload = {
+        sectionName: newSec.name,
+        floor: newSec.floorLevel || 'Ground Floor',
+        description: newSec.description || '',
+        maxSeats: Number(newSec.capacity) || 20,
+        status: newSec.isActive ? 'active' : 'inactive',
+      };
+
+      const res = await fetch(URLS.CreateFloorSections, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+
+      if (res.ok && (result.success || result.status)) {
+        showToast(`✓ Section "${newSec.name}" created successfully!`);
+        fetchSections();
+        fetchDashboardStats();
+      } else {
+        showToast(result.message || 'Failed to create section. Please try again.', 'error');
+      }
+    } catch (err) {
+      console.error('Error adding section:', err);
+      showToast('Network error while creating section.', 'error');
+    }
   };
 
-  // Edit Section
+  // Edit Section (PUT)
   const openEditModal = (sec) => {
     setEditingSection(sec);
     setIsEditModalOpen(true);
   };
 
-  const handleSaveSection = (updated) => {
-    setSections((prev) =>
-      prev.map((s) => (s.id === updated.id ? { ...s, ...updated } : s))
-    );
-    showToast(`✓ Section "${updated.name}" updated!`);
+  const handleSaveSection = async (updated) => {
+    try {
+      const targetId = updated.mongoId || updated.id;
+      const payload = {
+        sectionName: updated.name,
+        floor: updated.floorLevel || 'Ground Floor',
+        sectionType: updated.sectionType || 'Indoor Dining',
+        description: updated.description || '',
+        maxSeats: Number(updated.capacity) || 20,
+      };
+
+      const res = await fetch(`${URLS.UpdateFloorSections}${targetId}`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload),
+      });
+      const result = await res.json();
+
+      if (res.ok && (result.success || result.status)) {
+        showToast(`✓ Section "${updated.name}" updated successfully!`);
+        fetchSections();
+        fetchDashboardStats();
+      } else {
+        showToast(result.message || 'Failed to update section.', 'error');
+      }
+    } catch (err) {
+      console.error('Error updating section:', err);
+      showToast('Network error while updating section.', 'error');
+    }
   };
 
-  // Delete Section
-  const handleDelete = (sec) => {
+  // Delete Section (DELETE)
+  const handleDelete = async (sec) => {
     if (sec.tableCount > 0) {
       alert(`Cannot delete "${sec.name}" — it has ${sec.tableCount} tables assigned. Please reassign or delete those tables first.`);
       return;
     }
     if (window.confirm(`Delete section "${sec.name}" (${sec.id}) permanently?`)) {
-      setSections((prev) => prev.filter((s) => s.id !== sec.id));
-      showToast(`✓ Section "${sec.name}" deleted.`);
+      try {
+        const targetId = sec.mongoId || sec.id;
+        const res = await fetch(`${URLS.DeleteFloorSections}${targetId}`, {
+          method: 'DELETE',
+          headers: getAuthHeaders(),
+        });
+        const result = await res.json();
+
+        if (res.ok && (result.success || result.status)) {
+          showToast(`✓ Section "${sec.name}" deleted.`);
+          fetchSections();
+          fetchDashboardStats();
+        } else {
+          showToast(result.message || 'Failed to delete section.', 'error');
+        }
+      } catch (err) {
+        console.error('Error deleting section:', err);
+        showToast('Network error while deleting section.', 'error');
+      }
     }
   };
 
-  // Toggle Active
-  const toggleActive = (secId) => {
-    setSections((prev) =>
-      prev.map((s) => {
-        if (s.id !== secId) return s;
-        const next = !s.isActive;
-        showToast(`✓ Section "${s.name}" marked ${next ? 'Active' : 'Inactive'}.`);
-        return { ...s, isActive: next };
-      })
-    );
+  // Toggle Active (PUT /status)
+  const toggleActive = async (secId) => {
+    const target = sections.find((s) => s.id === secId || s.mongoId === secId);
+    if (!target) return;
+    const next = !target.isActive;
+    const statusPayload = next ? 'active' : 'inactive';
+
+    try {
+      const targetId = target.mongoId || target.id;
+      const res = await fetch(`${URLS.UpdateStatusFloorSection}${targetId}/status`, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ status: statusPayload }),
+      });
+      const result = await res.json();
+
+      if (res.ok && (result.success || result.status)) {
+        showToast(`✓ Section "${target.name}" marked ${next ? 'Active' : 'Inactive'}.`);
+        fetchSections();
+        fetchDashboardStats();
+      } else {
+        showToast(result.message || 'Failed to update status.', 'error');
+      }
+    } catch (err) {
+      console.error('Error updating section status:', err);
+      showToast('Network error while updating status.', 'error');
+    }
   };
 
   return (
@@ -216,8 +337,16 @@ export default function FloorSections() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
-            <RefreshCw size={15} /> Refresh
+          <button
+            type="button"
+            className="btn btn-outline"
+            onClick={() => {
+              fetchSections();
+              fetchDashboardStats();
+              showToast('Refreshed floor sections data');
+            }}
+          >
+            <RefreshCw size={15} className={isLoading ? 'spin' : ''} /> Refresh
           </button>
           <button
             type="button"
@@ -269,7 +398,7 @@ export default function FloorSections() {
         </div>
       </div>
 
-      {/* ── Search & Filter (Small size search bar) ────────── */}
+      {/* ── Search & Filter ────────────────────────────────── */}
       <div className="card" style={{ marginBottom: 22 }}>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
           <div className="svc-input-with-icon" style={{ width: 220 }}>
@@ -289,13 +418,21 @@ export default function FloorSections() {
             onChange={(e) => setStatusFilter(e.target.value)}
           >
             <option value="All">All Statuses</option>
-            <option value="Active">Active Only</option>
-            <option value="Inactive">Inactive Only</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
           </select>
         </div>
       </div>
 
-      {/* ── Enhanced Floor Section Cards Grid ─────────────── */}
+      {/* ── Loading Spinner / Skeleton ─────────────────────── */}
+      {isLoading && sections.length === 0 && (
+        <div style={{ padding: 40, textAlign: 'center', color: '#64748b' }}>
+          <RefreshCw size={24} className="spin" style={{ marginBottom: 8 }} />
+          <div>Loading floor sections...</div>
+        </div>
+      )}
+
+      {/* ── Floor Section Cards Grid ───────────────────────── */}
       <div
         className="svc-table-grid"
         style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 20 }}
@@ -320,7 +457,7 @@ export default function FloorSections() {
                 position: 'relative',
               }}
             >
-              {/* Subtle top color strip indicator */}
+              {/* Top color strip indicator */}
               <div
                 style={{
                   height: 4,
@@ -513,7 +650,7 @@ export default function FloorSections() {
         })}
       </div>
 
-      {filtered.length === 0 && (
+      {!isLoading && filtered.length === 0 && (
         <div
           style={{
             padding: 50,
@@ -526,7 +663,7 @@ export default function FloorSections() {
           }}
         >
           <MapPin size={32} style={{ opacity: 0.3, marginBottom: 10 }} />
-          <div>No sections found matching your search.</div>
+          <div>{sections.length === 0 ? 'No floor sections found. Click "+ Add Section" to create your first section.' : 'No sections found matching your search.'}</div>
         </div>
       )}
 
@@ -535,7 +672,7 @@ export default function FloorSections() {
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onAddSection={handleAddSection}
-        existingNames={sections.map((s) => s.name)}
+        existingNames={sections.map((s) => s.name || '')}
       />
 
       <UpdateSectionModal
@@ -549,9 +686,10 @@ export default function FloorSections() {
       />
 
       {/* Toast Feedback */}
-      {toastMessage && (
-        <div className="svc-toast success">
-          <CheckCircle2 size={18} /> {toastMessage}
+      {toast.message && (
+        <div className={`svc-toast ${toast.type}`}>
+          {toast.type === 'error' ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+          <span>{toast.message}</span>
         </div>
       )}
     </div>
