@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Network, Search, AlertCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Network, Search, AlertCircle, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import { URLS } from '../../url';
 
 export default function SubCategories() {
@@ -8,7 +8,12 @@ export default function SubCategories() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
 
-  const fetchSubCategories = async () => {
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalSubCategories, setTotalSubCategories] = useState(0);
+
+  const fetchSubCategories = useCallback(async (targetPage = 1, targetLimit = 10, searchQuery = '') => {
     setLoading(true);
     setError('');
     try {
@@ -18,12 +23,17 @@ export default function SubCategories() {
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        }
+        },
+        body: JSON.stringify({ page: targetPage, limit: targetLimit, search: searchQuery })
       });
       const result = await response.json();
       if (response.ok && result) {
         const list = result.subcategory || result.subcategories || result.data || (Array.isArray(result) ? result : []);
         setSubCategories(Array.isArray(list) ? list : []);
+        const pg = result.pagination || {};
+        setTotalPages(pg.totalPages || 1);
+        setTotalSubCategories(pg.totalRecords || pg.total || (Array.isArray(list) ? list.length : 0));
+        setPage(pg.currentPage || pg.page || targetPage);
       } else {
         setError(result?.message || 'Failed to load sub-categories.');
       }
@@ -33,17 +43,35 @@ export default function SubCategories() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Debounced search — reset to page 1
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchSubCategories(1, limit, search);
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, limit, fetchSubCategories]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
+    fetchSubCategories(newPage, limit, search);
   };
 
-  useEffect(() => {
-    fetchSubCategories();
-  }, []);
+  const getPageNumbers = () => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (page <= 3) return [1, 2, 3, 4, '...', totalPages];
+    if (page >= totalPages - 2) return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, '...', page - 1, page, page + 1, '...', totalPages];
+  };
 
   const getImageUrl = (imagePath) => {
     if (!imagePath) return '';
     if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
     const clean = imagePath.replace(/\\/g, '/').replace(/^\/+/, '');
-    const base = URLS.Image || URLS.Base || 'http://16.113.133.178:3000/';
+    const base = URLS.Image || URLS.Base || 'http://40.192.68.118:3000/';
     const baseWithSlash = base.endsWith('/') ? base : `${base}/`;
     return `${baseWithSlash}${clean}`;
   };
@@ -54,10 +82,8 @@ export default function SubCategories() {
     return s.categoryName || s.mainCategory || '';
   };
 
-  const filtered = subCategories.filter(s =>
-    getSubCategoryName(s).toLowerCase().includes(search.toLowerCase()) ||
-    getParentCategory(s).toLowerCase().includes(search.toLowerCase())
-  );
+  const startItem = (page - 1) * limit + 1;
+  const endItem = Math.min(page * limit, totalSubCategories);
 
   return (
     <div style={{ width: '100%' }}>
@@ -82,7 +108,7 @@ export default function SubCategories() {
             />
           </div>
           <button
-            onClick={fetchSubCategories}
+            onClick={() => fetchSubCategories(page, limit, search)}
             className="btn btn-outline btn-sm"
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             title="Refresh sub-categories"
@@ -105,60 +131,113 @@ export default function SubCategories() {
             <div>Loading sub-categories…</div>
           </div>
         ) : (
-          <div className="table-container">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>SL.NO</th>
-                  <th>Sub-Category Name</th>
-                  <th>Parent Category</th>
-                  <th>Priority</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.length > 0 ? (
-                  filtered.map((s, index) => (
-                    <tr key={s._id || s.id}>
-                      <td>{index + 1}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          {s.image ? (
-                            <img
-                              src={getImageUrl(s.image)}
-                              alt={getSubCategoryName(s)}
-                              style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }}
-                              onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div style={{ width: 38, height: 38, borderRadius: 8, background: 'var(--bg-main)', border: '1px solid var(--border)', display: 'grid', placeItems: 'center' }}>
-                              <Network size={16} color="var(--text-muted)" />
-                            </div>
-                          )}
-                          <strong style={{ fontSize: 14 }}>{getSubCategoryName(s)}</strong>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="badge badge-muted">{getParentCategory(s) || '—'}</span>
-                      </td>
-                      <td><span className="badge badge-muted">{s.priority || 1}</span></td>
-                      <td>
-                        <span className={`badge ${(s.status || '').toLowerCase() === 'active' ? 'badge-success' : 'badge-muted'}`}>
-                          {s.status || 'Active'}
-                        </span>
+          <>
+            <div className="table-container">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>SL.NO</th>
+                    <th>Sub-Category Name</th>
+                    <th>Parent Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {subCategories.length > 0 ? (
+                    subCategories.map((s, index) => (
+                      <tr key={s._id || s.id}>
+                        <td>{(page - 1) * limit + index + 1}</td>
+                        <td>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                            {s.image ? (
+                              <img
+                                src={getImageUrl(s.image)}
+                                alt={getSubCategoryName(s)}
+                                style={{ width: 38, height: 38, borderRadius: 8, objectFit: 'cover', border: '1px solid var(--border)' }}
+                                onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                              />
+                            ) : (
+                              <div style={{ width: 38, height: 38, borderRadius: 8, background: 'var(--bg-main)', border: '1px solid var(--border)', display: 'grid', placeItems: 'center' }}>
+                                <Network size={16} color="var(--text-muted)" />
+                              </div>
+                            )}
+                            <strong style={{ fontSize: 14 }}>{getSubCategoryName(s)}</strong>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="badge badge-muted">{getParentCategory(s) || '—'}</span>
+                        </td>
+                        <td><span className="badge badge-muted">{s.priority || 1}</span></td>
+                        <td>
+                          <span className={`badge ${(s.status || '').toLowerCase() === 'active' ? 'badge-success' : 'badge-muted'}`}>
+                            {s.status || 'Active'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
+                        No sub-categories found matching your search.
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} style={{ textAlign: 'center', padding: '32px 0', color: 'var(--text-muted)' }}>
-                      No sub-categories found matching your search.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalSubCategories > 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #e2e8f0', padding: '16px 4px', flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13, color: 'var(--text-muted)' }}>
+                  <span>Showing {totalSubCategories === 0 ? 0 : startItem} to {endItem} of {totalSubCategories} items</span>
+                  <select
+                    value={limit}
+                    onChange={(e) => { setLimit(Number(e.target.value)); setPage(1); fetchSubCategories(1, Number(e.target.value), search); }}
+                    style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '4px 8px', fontSize: 13, cursor: 'pointer' }}
+                  >
+                    {[5, 10, 20, 50].map(n => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <button
+                  type='button'
+                  className='btn btn-outline'
+                    onClick={() => handlePageChange(page - 1)}
+                    disabled={page === 1}
+                    style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    <ChevronLeft size={14} /> Previous
+                  </button>
+                  {getPageNumbers().map((p, i) => (
+                    <button
+                      key={i}
+                      onClick={() => typeof p === 'number' && handlePageChange(p)}
+                      disabled={p === '...'}
+                      style={{
+                        padding: '6px 12px', border: '1px solid var(--border)', borderRadius: 6, fontSize: 13, cursor: p === '...' ? 'default' : 'pointer',
+                        background: p === page ? 'var(--primary)' : '#fff',
+                        color: p === page ? '#fff' : 'inherit',
+                        fontWeight: p === page ? 700 : 400
+                      }}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                  <button
+                  type='button'
+                  className='btn btn-outline'
+                    onClick={() => handlePageChange(page + 1)}
+                    disabled={page === totalPages}
+                    style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                  >
+                    Next <ChevronRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

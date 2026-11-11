@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Star, MessageSquare, Trash2, Edit2, X, CheckCircle, Search, ThumbsUp, Loader } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Star, MessageSquare, Trash2, Edit2, X, CheckCircle, Search, ThumbsUp, Loader, ChevronLeft, ChevronRight } from 'lucide-react';
 import { URLS } from '../url';
 
 export default function Reviews() {
@@ -12,6 +12,10 @@ export default function Reviews() {
   const [search, setSearch] = useState('');
   const [selectedReview, setSelectedReview] = useState(null);
   const [replyInput, setReplyInput] = useState('');
+
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
 
   // Fetch restaurant profile to get restaurantId
   useEffect(() => {
@@ -47,71 +51,88 @@ export default function Reviews() {
     fetchProfile();
   }, []);
 
+  const fetchReviews = useCallback(async (rid, targetPage = 1, targetLimit = 10, searchQuery = '') => {
+    if (!rid) return;
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams({ page: targetPage, limit: targetLimit, search: searchQuery });
+      const response = await fetch(`${URLS.GetReviews}${rid}/reviews?${params.toString()}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const transformedReviews = (data.data || []).map(review => ({
+          id: review._id,
+          customer: review.customer?.name || 'Anonymous',
+          email: review.customer?.email || 'N/A',
+          phone: review.customer?.phone || '',
+          orderUniqueId:
+            review.orderUniqueId ||
+            review.orderUniqurId ||
+            review.order?.orderUniqueId ||
+            review.booking?.orderUniqueId ||
+            review.customer?.orderUniqueId ||
+            review.orderId ||
+            'N/A',
+          rating: review.rating,
+          date: new Date(review.createdAt).toISOString().split('T')[0],
+          comment: review.comment,
+          reply: ''
+        }));
+
+        setReviews(transformedReviews);
+        const pg = data.pagination || {};
+        setTotalReviews(pg.totalRecords || pg.total || data.totalReviews || transformedReviews.length);
+        setTotalPages(pg.totalPages || 1);
+        setPage(pg.currentPage || pg.page || targetPage);
+      } else {
+        setError(data.message || 'Failed to fetch reviews');
+      }
+    } catch (err) {
+      console.error('Reviews fetch error:', err);
+      setError('Failed to load reviews');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   // Fetch reviews once restaurantId is available
   useEffect(() => {
     if (!restaurantId) return;
-
-    const fetchReviews = async () => {
-      try {
-        setLoading(true);
-        const token = localStorage.getItem('token');
-
-        const response = await fetch(`${URLS.GetReviews}${restaurantId}/reviews`, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-
-        const data = await response.json();
-
-        if (data.success) {
-          // Transform API data to match component structure
-          const transformedReviews = data.data.map(review => ({
-            id: review._id,
-            customer: review.customer?.name || 'Anonymous',
-            email: review.customer?.email || 'N/A',
-            phone: review.customer?.phone || '',
-            // API may place orderUniqueId on the review, nested order/booking, or customer
-            orderUniqueId:
-              review.orderUniqueId ||
-              review.orderUniqurId ||
-              review.order?.orderUniqueId ||
-              review.booking?.orderUniqueId ||
-              review.customer?.orderUniqueId ||
-              review.orderId ||
-              'N/A',
-            rating: review.rating,
-            date: new Date(review.createdAt).toISOString().split('T')[0],
-            comment: review.comment,
-            reply: ''
-          }));
-
-          setReviews(transformedReviews);
-          setTotalReviews(data.totalReviews || transformedReviews.length);
-        } else {
-          setError(data.message || 'Failed to fetch reviews');
-        }
-      } catch (err) {
-        console.error('Reviews fetch error:', err);
-        setError('Failed to load reviews');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchReviews();
+    fetchReviews(restaurantId, 1, limit, search);
   }, [restaurantId]);
 
-  const filtered = reviews.filter(r => {
-    const q = search.toLowerCase();
-    return (
-      r.customer.toLowerCase().includes(q) ||
-      (r.orderUniqueId && String(r.orderUniqueId).toLowerCase().includes(q)) ||
-      (r.comment && r.comment.toLowerCase().includes(q))
-    );
-  });
+  // Debounced search
+  useEffect(() => {
+    if (!restaurantId) return;
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchReviews(restaurantId, 1, limit, search);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [search, limit, restaurantId, fetchReviews]);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages) return;
+    setPage(newPage);
+    fetchReviews(restaurantId, newPage, limit, search);
+  };
+
+  const getPageNumbers = () => {
+    if (totalPages <= 5) return Array.from({ length: totalPages }, (_, i) => i + 1);
+    if (page <= 3) return [1, 2, 3, 4, '...', totalPages];
+    if (page >= totalPages - 2) return [1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+    return [1, '...', page - 1, page, page + 1, '...', totalPages];
+  };
+
+  const filtered = reviews;
 
   const openReplyModal = (r) => {
     setSelectedReview(r);
@@ -159,6 +180,9 @@ export default function Reviews() {
       </div>
     );
   }
+
+  const startIndex = totalReviews === 0 ? 0 : (page - 1) * limit + 1;
+  const endIndex = totalReviews === 0 ? 0 : Math.min(page * limit, totalReviews);
 
   return (
     <div>
@@ -322,6 +346,94 @@ export default function Reviews() {
               </tbody>
             </table>
           )}
+        </div>
+
+
+        {/* ══════════════════════════════════════════════
+            PAGINATION CONTROLS
+            ══════════════════════════════════════════════ */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '16px 4px',
+          borderTop: '1px solid #e2e8f0',
+          flexWrap: 'wrap',
+          gap: 12,
+          fontSize: 13,
+          color: '#475569',
+        }}>
+          {/* Left: Range and Per-page select */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            <span>
+              Showing <strong>{startIndex}</strong> to <strong>{endIndex}</strong> of <strong>{totalReviews}</strong> reviews
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span>Rows per page:</span>
+              <select
+                value={limit}
+                onChange={(e) => handleLimitChange(Number(e.target.value))}
+                className="form-select"
+                style={{ width: 'auto', padding: '4px 8px', height: 32, fontSize: 12.5 }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Right: Previous, Page Numbers, Next */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              disabled={page <= 1 || loading}
+              onClick={() => handlePageChange(page - 1)}
+            >
+              <ChevronLeft size={14} /> Previous
+            </button>
+
+            {getPageNumbers().map((p, idx) => (
+              p === '...' ? (
+                <span key={`dots-${idx}`} style={{ padding: '0 6px', color: '#94a3b8' }}>...</span>
+              ) : (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => handlePageChange(p)}
+                  disabled={loading}
+                  style={{
+                    minWidth: 32,
+                    height: 32,
+                    padding: '0 8px',
+                    borderRadius: 6,
+                    fontSize: 12.5,
+                    fontWeight: p === page ? 750 : 500,
+                    border: p === page ? '1.5px solid var(--primary, #f97316)' : '1px solid #cbd5e1',
+                    background: p === page ? 'var(--primary, #f97316)' : '#ffffff',
+                    color: p === page ? '#ffffff' : '#334155',
+                    cursor: p === page ? 'default' : 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {p}
+                </button>
+              )
+            ))}
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              disabled={page >= totalPages || isLoading}
+              onClick={() => handlePageChange(page + 1)}
+            >
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
         </div>
       </div>
 

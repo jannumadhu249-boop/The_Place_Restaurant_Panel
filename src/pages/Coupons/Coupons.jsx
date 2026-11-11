@@ -50,7 +50,7 @@ export default function Coupons() {
     };
   };
 
-  // Fetch Coupons (GET /v1/place/admin/coupon/getAll?page=X&limit=Y&searchQuery=Z)
+  // Fetch Coupons
   const fetchCoupons = useCallback(async (searchQuery = search, targetPage = page, targetLimit = limit) => {
     setIsLoading(true);
     try {
@@ -157,7 +157,7 @@ export default function Coupons() {
     fetchCoupons(search, 1, newLimit);
   };
 
-  // Toggle Coupon Active / Inactive status (PUT /v1/place/admin/coupon/edit/:id)
+  // Toggle Coupon Active / Inactive status
   const toggleStatus = async (coupon) => {
     const nextStatus = coupon.active ? 'inactive' : 'active';
     const targetId = coupon._id || coupon.id;
@@ -194,7 +194,7 @@ export default function Coupons() {
     }
   };
 
-  // Delete Coupon (DELETE /v1/place/admin/coupon/delete/:id)
+  // Delete Coupon
   const deleteCoupon = async (coupon) => {
     const targetId = coupon._id || coupon.id;
     if (!window.confirm(`Are you sure you want to delete coupon "${coupon.code}"?`)) {

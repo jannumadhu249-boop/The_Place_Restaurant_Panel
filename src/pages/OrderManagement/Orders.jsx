@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShoppingCart,
   Eye,
@@ -11,7 +11,9 @@ import {
   Clock,
   RefreshCw,
   AlertCircle,
-  FileText
+  FileText,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { URLS } from '../../url';
 import ViewOrder from './ViewOrder';
@@ -25,18 +27,30 @@ export default function Orders() {
   const [filter, setFilter] = useState('All');
   const [search, setSearch] = useState('');
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+
   // Detail Modal State
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async (targetPage = page, targetLimit = limit) => {
     setLoading(true);
     setError('');
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(URLS.GetOrders, {
+      const queryParams = new URLSearchParams({
+        page: String(targetPage),
+        limit: String(targetLimit),
+      });
+      const url = `${URLS.GetOrders}${URLS.GetOrders.includes('?') ? '&' : '?'}${queryParams.toString()}`;
+
+      const response = await fetch(url, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': `Bearer ${token}` } : {}) }
       });
@@ -44,7 +58,29 @@ export default function Orders() {
 
       if (response.ok && result) {
         const list = result.data || result.bookings || result.orders || (Array.isArray(result) ? result : []);
-        setOrders(Array.isArray(list) ? list : []);
+        const paginationMeta = result.pagination || {};
+        const isServerPaginated = paginationMeta.totalRecords !== undefined || paginationMeta.totalPages !== undefined;
+
+        let total = list.length;
+        let pages = 1;
+        let displayList = list;
+
+        if (isServerPaginated) {
+          total = Number(paginationMeta.totalRecords ?? paginationMeta.total ?? list.length);
+          pages = Number(paginationMeta.totalPages ?? Math.max(1, Math.ceil(total / targetLimit)));
+          displayList = list;
+        } else {
+          total = list.length;
+          pages = Math.max(1, Math.ceil(total / targetLimit));
+          const start = (targetPage - 1) * targetLimit;
+          displayList = list.slice(start, start + targetLimit);
+        }
+
+        setOrders(Array.isArray(displayList) ? displayList : []);
+        setTotalRecords(total);
+        setTotalPages(pages);
+        setPage(targetPage);
+        setLimit(targetLimit);
       } else {
         setError(result?.message || 'Failed to load bookings.');
       }
@@ -54,11 +90,37 @@ export default function Orders() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit]);
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(page, limit);
   }, []);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === page || loading) return;
+    fetchOrders(newPage, limit);
+  };
+
+  const handleLimitChange = (newLimit) => {
+    fetchOrders(1, newLimit);
+  };
+
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (page <= 3) {
+        pages.push(1, 2, 3, 4, '...', totalPages);
+      } else if (page >= totalPages - 2) {
+        pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, '...', page - 1, page, page + 1, '...', totalPages);
+      }
+    }
+    return pages;
+  };
 
   const handleViewOrder = async (order) => {
     const mongoId = order._id || order.id || order.bookingId;
@@ -586,6 +648,95 @@ export default function Orders() {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════
+            PAGINATION CONTROLS
+        ══════════════════════════════════════════════ */}
+        {!loading && orders.length > 0 && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 20px',
+            borderTop: '1px solid #e2e8f0',
+            flexWrap: 'wrap',
+            gap: 12,
+            fontSize: 13,
+            color: '#475569',
+          }}>
+            {/* Left: Range and Per-page select */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <span>
+                Showing <strong>{totalRecords === 0 ? 0 : (page - 1) * limit + 1}</strong> to <strong>{Math.min(page * limit, totalRecords)}</strong> of <strong>{totalRecords}</strong> orders
+              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>Rows per page:</span>
+                <select
+                  value={limit}
+                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  className="form-select"
+                  style={{ width: 'auto', padding: '4px 8px', height: 32, fontSize: 12.5 }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right: Previous, Page Numbers, Next */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                disabled={page <= 1 || loading}
+                onClick={() => handlePageChange(page - 1)}
+              >
+                <ChevronLeft size={14} /> Previous
+              </button>
+
+              {getPageNumbers().map((p, idx) => (
+                p === '...' ? (
+                  <span key={`dots-${idx}`} style={{ padding: '0 6px', color: '#94a3b8' }}>...</span>
+                ) : (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => handlePageChange(p)}
+                    disabled={loading}
+                    style={{
+                      minWidth: 32,
+                      height: 32,
+                      padding: '0 8px',
+                      borderRadius: 6,
+                      fontSize: 12.5,
+                      fontWeight: p === page ? 750 : 500,
+                      border: p === page ? '1.5px solid var(--primary, #f97316)' : '1px solid #cbd5e1',
+                      background: p === page ? 'var(--primary, #f97316)' : '#ffffff',
+                      color: p === page ? '#ffffff' : '#334155',
+                      cursor: p === page ? 'default' : 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {p}
+                  </button>
+                )
+              ))}
+
+              <button
+                type="button"
+                className="btn btn-outline"
+                style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                disabled={page >= totalPages || loading}
+                onClick={() => handlePageChange(page + 1)}
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
           </div>
         )}
       </div>
