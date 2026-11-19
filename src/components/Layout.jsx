@@ -46,8 +46,8 @@ export default function Layout({ onLogout }) {
     { to: '/service/floor-sections', label: 'Floor Sections', icon: MapPin },
     { to: '/service/captains', label: 'Servers', icon: UserCheck },
 
-    { section: 'Billing' },
-    { to: '/billing', label: 'Billing', icon: Receipt },
+    // { section: 'Billing' },
+    // { to: '/billing', label: 'Billing', icon: Receipt },
 
     { section: 'Food Management' },
     { to: '/food-management/foods', label: 'Foods Menu', icon: UtensilsCrossed },

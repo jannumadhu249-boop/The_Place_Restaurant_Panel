@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   ShoppingBag,
   X,
@@ -8,8 +8,7 @@ import {
   Minus,
   CheckCircle2,
   Banknote,
-  Smartphone,
-  CreditCard,
+  Globe,
   Tag,
   RefreshCw,
   AlertCircle,
@@ -21,7 +20,6 @@ export default function NewTakeawayOrderModal({
   onClose,
   menuItems = [],
   menuCategories = [],
-  availableCoupons = [],
   packingFee = 15,
   money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`,
   onOrderSuccess,
@@ -29,7 +27,6 @@ export default function NewTakeawayOrderModal({
   const [guest, setGuest] = useState('');
   const [phone, setPhone] = useState('');
   const [payMethod, setPayMethod] = useState('Cash');
-  const [cashReceived, setCashReceived] = useState('');
   const [notes, setNotes] = useState('');
 
   // Food selection
@@ -38,6 +35,7 @@ export default function NewTakeawayOrderModal({
   const [search, setSearch] = useState('');
 
   // Coupons & Discounts
+  const [activeCoupons, setActiveCoupons] = useState([]);
   const [couponInput, setCouponInput] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [manualDiscount, setManualDiscount] = useState('');
@@ -45,24 +43,6 @@ export default function NewTakeawayOrderModal({
   // Submission state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
-
-  useEffect(() => {
-    if (isOpen) {
-      setGuest('');
-      setPhone('');
-      setPayMethod('Cash');
-      setCashReceived('');
-      setNotes('');
-      setCart({});
-      setCategory('All');
-      setSearch('');
-      setCouponInput('');
-      setAppliedCoupon(null);
-      setManualDiscount('');
-      setIsSubmitting(false);
-      setSubmitError('');
-    }
-  }, [isOpen]);
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('token');
@@ -72,6 +52,50 @@ export default function NewTakeawayOrderModal({
       ...(hasToken ? { Authorization: `Bearer ${token.trim()}` } : {}),
     };
   };
+
+  // Fetch active coupons on modal open
+  const fetchActiveCoupons = useCallback(async () => {
+    try {
+      const res = await fetch(URLS.GetActiveCoupons, { headers: getAuthHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.coupons || data.data || data.coupon || (Array.isArray(data) ? data : []);
+        if (Array.isArray(list)) {
+          const mapped = list.map((c) => ({
+            code: c.code || c.couponCode || '',
+            type: (c.type || c.discountType || 'amount') === 'percentage' ? 'percent' : 'flat',
+            value: Number(c.discount || c.value || c.discountValue || 0),
+            label: (c.type === 'percentage')
+              ? `${c.discount || c.value}% OFF`
+              : `₹${c.discount || c.value} OFF`,
+            _id: c._id,
+            description: c.description || '',
+          }));
+          setActiveCoupons(mapped);
+        }
+      }
+    } catch (err) {
+      console.warn('Could not fetch coupons for modal:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setGuest('');
+      setPhone('');
+      setPayMethod('Cash');
+      setNotes('');
+      setCart({});
+      setCategory('All');
+      setSearch('');
+      setCouponInput('');
+      setAppliedCoupon(null);
+      setManualDiscount('');
+      setIsSubmitting(false);
+      setSubmitError('');
+      fetchActiveCoupons();
+    }
+  }, [isOpen, fetchActiveCoupons]);
 
   const filteredMenu = useMemo(() => {
     return menuItems.filter((m) => {
@@ -142,21 +166,21 @@ export default function NewTakeawayOrderModal({
   const handleApplyCoupon = (codeToApply) => {
     const code = (codeToApply || couponInput).trim().toUpperCase();
     if (!code) return;
-    const found = availableCoupons.find((c) => c.code === code);
+    const found = activeCoupons.find((c) => c.code === code);
     if (!found) {
-      alert(`Invalid coupon "${code}".`);
+      alert(`Invalid or inactive coupon "${code}".`);
       return;
     }
     setAppliedCoupon(found);
     setCouponInput(code);
   };
 
-  // Direct backend create order API call (POST /v1/place/restaurant/takeaway/orders)
+  // Direct backend create order API call
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitError('');
 
-    // Customer Name is Optional (default to 'Guest')
+    // Customer Name is optional
     const customerName = guest.trim() || 'Guest';
 
     // 10-digit Phone Validation
@@ -171,15 +195,10 @@ export default function NewTakeawayOrderModal({
       return;
     }
 
-    // Payment validation: Cash requires sufficient tender if filled
-    if (payMethod === 'Cash' && cashReceived && Number(cashReceived) < total) {
-      setSubmitError(`Cash received (${money(cashReceived)}) is less than total due (${money(total)}).`);
-      return;
-    }
-
     setIsSubmitting(true);
 
     try {
+      const selectedPayment = payMethod === 'Online' ? 'online' : 'cash';
       const payload = {
         customerName,
         customerPhone: cleanPhone,
@@ -187,8 +206,9 @@ export default function NewTakeawayOrderModal({
           productId: item.productId || item._id || item.id,
           quantity: Number(item.qty || 1),
         })),
-        pickupSlot: 'Immediate',
-        paymentMethod: (payMethod || 'cash').toLowerCase(),
+        paymentMethod: selectedPayment,
+        ...(appliedCoupon ? { couponCode: appliedCoupon.code } : {}),
+        ...(Number(manualDiscount) > 0 ? { manualDiscount: Number(manualDiscount) } : {}),
         notes: notes.trim() || (appliedCoupon ? `Coupon: ${appliedCoupon.code}` : 'Takeaway Order'),
       };
 
@@ -204,21 +224,22 @@ export default function NewTakeawayOrderModal({
         const createdOrder = result.data || result.order || {};
         const orderId = createdOrder._id || result._id;
 
-        // If paid with UPI or Card, record the payment transaction
-        if (orderId && (payMethod === 'UPI' || payMethod === 'Card')) {
+        // Record payment transaction for Online
+        if (orderId && selectedPayment === 'online') {
           try {
             await fetch(`${URLS.UpdateTakeawayPayment}${orderId}/payment`, {
               method: 'PUT',
               headers: getAuthHeaders(),
-              body: JSON.stringify({ transactionId: `${payMethod}-${Date.now()}` }),
+              body: JSON.stringify({ transactionId: `ONLINE-${Date.now()}` }),
             });
           } catch (payErr) {
             console.warn('Payment update warning:', payErr);
           }
         }
 
+        // Build the order object for the bill receipt
         const formattedOrderForBill = {
-          id: createdOrder.orderNumber || (orderId ? `TKW-${orderId.slice(-4).toUpperCase()}` : 'TKW-NEW'),
+          id: createdOrder.orderNumber || createdOrder.orderId || (orderId ? `TKW-${orderId.slice(-4).toUpperCase()}` : 'TKW-NEW'),
           mongoId: orderId,
           _id: orderId,
           guest: customerName,
@@ -242,6 +263,7 @@ export default function NewTakeawayOrderModal({
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         };
 
+        // Also pass the raw result so parent can use invoice data from server
         if (onOrderSuccess) {
           onOrderSuccess(result, formattedOrderForBill);
         }
@@ -266,11 +288,7 @@ export default function NewTakeawayOrderModal({
           <div className="svc-modal-title">
             <ShoppingBag size={20} color="var(--primary)" /> New Takeaway Order & Menu
           </div>
-          <button
-            type="button"
-            className="svc-modal-close-btn"
-            onClick={onClose}
-          >
+          <button type="button" className="svc-modal-close-btn" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
@@ -279,16 +297,9 @@ export default function NewTakeawayOrderModal({
           <div className="svc-modal-body">
             {submitError && (
               <div style={{
-                background: '#fef2f2',
-                border: '1px solid #fca5a5',
-                color: '#b91c1c',
-                padding: '10px 14px',
-                borderRadius: 8,
-                marginBottom: 14,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                fontSize: 13,
+                background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c',
+                padding: '10px 14px', borderRadius: 8, marginBottom: 14,
+                display: 'flex', alignItems: 'center', gap: 8, fontSize: 13,
               }}>
                 <AlertCircle size={16} />
                 <span>{submitError}</span>
@@ -313,7 +324,7 @@ export default function NewTakeawayOrderModal({
                   />
                 </div>
 
-                {/* Display All Categories */}
+                {/* Category filters */}
                 <div className="svc-menu-cats" style={{ flexWrap: 'wrap', gap: 6 }}>
                   {menuCategories.map((c) => (
                     <button
@@ -383,7 +394,7 @@ export default function NewTakeawayOrderModal({
 
                 {/* Optional Customer Name */}
                 <div className="form-group" style={{ marginBottom: 12 }}>
-                  <label className="form-label">Customer Name</label>
+                  <label className="form-label">Customer Name <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(optional)</span></label>
                   <input
                     className="form-control"
                     placeholder="e.g. Aisha Khan (or leave blank for Guest)"
@@ -394,7 +405,7 @@ export default function NewTakeawayOrderModal({
 
                 {/* 10-Digit Mobile Phone */}
                 <div className="form-group" style={{ marginBottom: 14 }}>
-                  <label className="form-label">Phone Number *</label>
+                  <label className="form-label">Phone Number <span style={{ color: '#ef4444' }}>*</span></label>
                   <input
                     type="tel"
                     className="form-control"
@@ -404,11 +415,11 @@ export default function NewTakeawayOrderModal({
                     onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     required
                   />
-                  {/* {phone && phone.length !== 10 && (
-                    <div style={{ fontSize: 11, color: '#ea580c', marginTop: 4 }}>
-                      {10 - phone.length} more digits required
+                  {phone && phone.length !== 10 && (
+                    <div style={{ fontSize: 11, color: '#ea580c', marginTop: 3 }}>
+                      {10 - phone.length} more digit{10 - phone.length !== 1 ? 's' : ''} required
                     </div>
-                  )} */}
+                  )}
                 </div>
 
                 {/* Coupon & Discount Section */}
@@ -420,7 +431,7 @@ export default function NewTakeawayOrderModal({
                     <input
                       type="text"
                       className="form-control"
-                      placeholder="Coupon (e.g. WELCOME10)"
+                      placeholder="Coupon code (e.g. WELCOME10)"
                       value={couponInput}
                       onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
                       style={{ textTransform: 'uppercase', fontSize: 12, height: 32 }}
@@ -430,10 +441,7 @@ export default function NewTakeawayOrderModal({
                         type="button"
                         className="btn btn-outline"
                         style={{ fontSize: 11, padding: '0 10px', color: '#ef4444', borderColor: '#fca5a5' }}
-                        onClick={() => {
-                          setAppliedCoupon(null);
-                          setCouponInput('');
-                        }}
+                        onClick={() => { setAppliedCoupon(null); setCouponInput(''); }}
                       >
                         Remove
                       </button>
@@ -449,40 +457,62 @@ export default function NewTakeawayOrderModal({
                     )}
                   </div>
 
-                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
-                    {availableCoupons.map((cpn) => (
-                      <button
-                        key={cpn.code}
-                        type="button"
-                        onClick={() => handleApplyCoupon(cpn.code)}
-                        style={{
-                          fontSize: 10.5,
-                          padding: '2px 6px',
-                          borderRadius: 5,
-                          border: appliedCoupon?.code === cpn.code ? '1.5px solid var(--primary)' : '1px dashed #cbd5e1',
-                          background: appliedCoupon?.code === cpn.code ? '#fff7ed' : '#ffffff',
-                          color: appliedCoupon?.code === cpn.code ? 'var(--primary)' : '#475569',
-                          fontWeight: 650,
-                          cursor: 'pointer',
-                        }}
-                      >
-                        {cpn.code} ({cpn.label})
-                      </button>
-                    ))}
-                  </div>
+                  {/* Active Coupons from API */}
+                  {activeCoupons.length > 0 ? (
+                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 6 }}>
+                      {activeCoupons.map((cpn) => (
+                        <button
+                          key={cpn.code}
+                          type="button"
+                          onClick={() => handleApplyCoupon(cpn.code)}
+                          style={{
+                            fontSize: 10.5, padding: '2px 7px', borderRadius: 5,
+                            border: appliedCoupon?.code === cpn.code ? '1.5px solid var(--primary)' : '1px dashed #cbd5e1',
+                            background: appliedCoupon?.code === cpn.code ? '#fff7ed' : '#ffffff',
+                            color: appliedCoupon?.code === cpn.code ? 'var(--primary)' : '#475569',
+                            fontWeight: 650, cursor: 'pointer',
+                          }}
+                          title={cpn.description || cpn.label}
+                        >
+                          {cpn.code} ({cpn.label})
+                        </button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 4 }}>No active coupons available</div>
+                  )}
+
+                  {appliedCoupon && (
+                    <div style={{ fontSize: 11, color: '#059669', background: '#ecfdf5', padding: '4px 8px', borderRadius: 5, marginBottom: 6 }}>
+                      ✓ Coupon <strong>{appliedCoupon.code}</strong> applied — {appliedCoupon.label}
+                    </div>
+                  )}
 
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <input
                       type="number"
                       min="0"
                       className="form-control"
-                      placeholder="Manual discount (₹)"
+                      placeholder="Custom manual discount (₹)"
                       value={manualDiscount}
                       onChange={(e) => setManualDiscount(e.target.value)}
                       style={{ fontSize: 12, height: 30 }}
                     />
                   </div>
                 </div>
+
+                {/* Selected items summary */}
+                {cartItems.length > 0 && (
+                  <div style={{ background: '#fff', padding: 10, borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 10 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 4 }}>Selected Items:</div>
+                    {cartItems.map((it) => (
+                      <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#334155', marginBottom: 2 }}>
+                        <span>{it.qty} × {it.dishName || it.name}</span>
+                        <strong>{money(it.subtotal)}</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* Order summary */}
                 <div style={{ background: '#ffffff', padding: 12, borderRadius: 10, border: '1px solid #cbd5e1', marginBottom: 14 }}>
@@ -507,49 +537,25 @@ export default function NewTakeawayOrderModal({
                 </div>
 
                 {/* Payment Mode */}
-                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Payment Tender *</label>
-                <div className="svc-checkout-tender-tabs" style={{ marginBottom: 10 }}>
+                <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Payment Method <span style={{ color: '#ef4444' }}>*</span></label>
+                <div className="svc-checkout-tender-tabs" style={{ marginBottom: 12 }}>
                   <button
                     type="button"
                     className={`svc-checkout-tender-btn ${payMethod === 'Cash' ? 'active' : ''}`}
                     onClick={() => setPayMethod('Cash')}
+                    style={{ padding: '12px', fontSize: 13.5 }}
                   >
-                    <Banknote size={15} /> Cash
+                    <Banknote size={18} /> Cash ({money(total)})
                   </button>
                   <button
                     type="button"
-                    className={`svc-checkout-tender-btn ${payMethod === 'UPI' ? 'active' : ''}`}
-                    onClick={() => setPayMethod('UPI')}
+                    className={`svc-checkout-tender-btn ${payMethod === 'Online' ? 'active' : ''}`}
+                    onClick={() => setPayMethod('Online')}
+                    style={{ padding: '12px', fontSize: 13.5 }}
                   >
-                    <Smartphone size={15} /> UPI
-                  </button>
-                  <button
-                    type="button"
-                    className={`svc-checkout-tender-btn ${payMethod === 'Card' ? 'active' : ''}`}
-                    onClick={() => setPayMethod('Card')}
-                  >
-                    <CreditCard size={15} /> Card
+                    <Globe size={18} /> Online ({money(total)})
                   </button>
                 </div>
-
-                {payMethod === 'Cash' && (
-                  <div className="form-group" style={{ marginBottom: 8 }}>
-                    <input
-                      type="number"
-                      className="form-control"
-                      placeholder={`Cash tendered (₹, total is ${money(total)})`}
-                      value={cashReceived}
-                      onChange={(e) => setCashReceived(e.target.value)}
-                    />
-                    {Number(cashReceived) > 0 && total > 0 && (
-                      <div style={{ fontSize: 11.5, marginTop: 4, color: Number(cashReceived) >= total ? '#059669' : '#dc2626', fontWeight: 650 }}>
-                        {Number(cashReceived) >= total
-                          ? `Change to return: ${money(Number(cashReceived) - total)}`
-                          : `Insufficient cash (${money(total - Number(cashReceived))} more required)`}
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 <div className="form-group" style={{ marginBottom: 8 }}>
                   <input
@@ -570,7 +576,7 @@ export default function NewTakeawayOrderModal({
                 >
                   {isSubmitting ? (
                     <>
-                      <RefreshCw size={15} className="spin" /> Placing Order & Settling...
+                      <RefreshCw size={15} className="spin" /> Placing Order...
                     </>
                   ) : (
                     <>

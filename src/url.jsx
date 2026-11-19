@@ -28,6 +28,7 @@ export const URLS = {
     GetActiveSubCategories: base_url + "v1/place/admin/subcategory/getall-active",
 
     //Food Management
+    GetAvailableFoodMenu: base_url + "v1/place/restaurant/food/menu",
     GetFoodMenu: base_url + "v1/place/restaurant/food/menu",
     CreateFoodMenu: base_url + "v1/place/restaurant/food",
     UpdateFoodMenu: base_url + "v1/place/restaurant/food/",
@@ -57,6 +58,7 @@ export const URLS = {
     DeleteFloorSections: base_url + "v1/place/restaurant/floor-sections/",
 
     //Tables
+    GetAvailableTables: base_url + "v1/place/restaurant/dine-in/tables",
     GetTableCards: base_url + "v1/place/restaurant/tables-management/dashboard",
     GetTables: base_url + "v1/place/restaurant/tables-management/tables",
     CreateTables: base_url + "v1/place/restaurant/tables-management/tables/add",
@@ -64,6 +66,8 @@ export const URLS = {
     UpdateTableStatus: base_url + "v1/place/restaurant/tables-management/tables/",
     AssignCaptainTable: base_url + "v1/place/restaurant/tables-management/tables/",
     DeleteTables: base_url + "v1/place/restaurant/tables-management/tables/",
+    CreateTableReservation: base_url + "v1/place/restaurant/dine-in/reservations/add",
+    CancelTableReservation: base_url + "v1/place/restaurant/dine-in/reservations/update-status",
 
     //Servers
     GetServerCards: base_url + "v1/place/restaurant/floor-staff/dashboard",
@@ -90,6 +94,16 @@ export const URLS = {
     CreateCoupon: base_url + "v1/place/admin/coupon/add",
     UpdateCoupon: base_url + "v1/place/admin/coupon/edit/",
     DeleteCoupon: base_url + "v1/place/admin/coupon/delete/",
+
+    //Dine In 
+    EnableDineIn: base_url + "v1/place/restaurant/dine-in/service-status",
+    GetDineInCards: base_url + "v1/place/restaurant/dine-in/dashboard",
+    GetDineIn: base_url + "v1/place/restaurant/dine-in/sessions/active",
+    CreateDineIn: base_url + "v1/place/restaurant/dine-in/sessions/walk-in",
+    CheckoutDineIn: base_url + "v1/place/restaurant/dine-in/sessions/checkout",
+    GetDineInOrders: base_url + "v1/place/restaurant/dine-in/orders",
+    CreateDineInOrder: base_url + "v1/place/restaurant/dine-in/orders/add",
+
 
 
 }

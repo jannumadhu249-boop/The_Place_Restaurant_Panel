@@ -192,51 +192,8 @@ textarea.form-control {
 }
 
 /* ══════════════════════════════════════════════
-   SECTION GRIDS & LAYOUT
+   TABLE FLOOR PLAN (shared card shell)
 ══════════════════════════════════════════════ */
-
-.svc-section-grid {
-  display: grid;
-  grid-template-columns: 1.35fr 1fr;
-  gap: 22px;
-  margin-bottom: 24px;
-}
-
-@media (max-width: 1024px) {
-  .svc-section-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ══════════════════════════════════════════════
-   TABLE FLOOR PLAN (DineIn)
-══════════════════════════════════════════════ */
-
-.svc-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 16px;
-  padding: 10px 14px;
-  background: #f8fafc;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-}
-
-.svc-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: #475569;
-  font-weight: 650;
-}
-
-.svc-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
 
 .svc-table-grid {
   display: grid;
@@ -296,17 +253,21 @@ textarea.form-control {
   background: #f8fafc;
 }
 
+.svc-table-card.maintenance {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+}
+
+.svc-table-card.inactive {
+  border-color: #e2e8f0;
+  background: #f1f5f9;
+  opacity: 0.75;
+}
+
 .svc-table-card.selected {
   box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.35);
   border-color: var(--primary) !important;
   transform: translateY(-2px);
-}
-
-.svc-table-no {
-  font-size: 18px;
-  font-weight: 850;
-  color: var(--text-main);
-  letter-spacing: -0.3px;
 }
 
 .svc-table-meta {
@@ -319,6 +280,106 @@ textarea.form-control {
 /* ══════════════════════════════════════════════
    TAKEAWAY QUEUE LIST
 ══════════════════════════════════════════════ */
+
+/* Status count chips that double as queue filters */
+.svc-queue-filter-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.svc-filter-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 5px 3px 11px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 650;
+  line-height: 1.7;
+  cursor: pointer;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #475569;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.svc-filter-badge:hover {
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.svc-filter-badge .svc-filter-count {
+  min-width: 19px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 750;
+  text-align: center;
+  background: #e2e8f0;
+  color: #334155;
+}
+
+.svc-filter-badge.queued {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.svc-filter-badge.queued .svc-filter-count {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.svc-filter-badge.preparing {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+
+.svc-filter-badge.preparing .svc-filter-count {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.svc-filter-badge.ready {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #047857;
+}
+
+.svc-filter-badge.ready .svc-filter-count {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.svc-filter-badge.active {
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.14);
+}
+
+.svc-filter-badge.active.queued {
+  background: #2563eb;
+  border-color: #2563eb;
+  color: #ffffff;
+}
+
+.svc-filter-badge.active.preparing {
+  background: #d97706;
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+.svc-filter-badge.active.ready {
+  background: #059669;
+  border-color: #059669;
+  color: #ffffff;
+}
+
+.svc-filter-badge.active .svc-filter-count {
+  background: rgba(255, 255, 255, 0.26);
+  color: inherit;
+}
 
 .svc-queue-list {
   display: flex;
@@ -464,33 +525,6 @@ textarea.form-control {
   border-radius: var(--radius-lg);
   padding: 22px;
   box-shadow: 0 8px 24px -4px rgba(12, 17, 29, 0.4);
-}
-
-.svc-bill-row {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 13.5px;
-  padding: 8px 0;
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.svc-bill-row strong {
-  color: #ffffff;
-}
-
-.svc-bill-row.total {
-  border-top: 1px dashed rgba(255, 255, 255, 0.2);
-  margin-top: 10px;
-  padding-top: 14px;
-  font-size: 15px;
-  font-weight: 750;
-  color: #ffffff;
-}
-
-.svc-bill-row.total strong {
-  color: #fb923c;
-  font-size: 22px;
 }
 
 /* Payment Method Cards */
@@ -1012,43 +1046,6 @@ textarea.form-control {
   color: var(--text-main);
 }
 
-.svc-cart-summary {
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 14px;
-  margin-top: 4px;
-}
-
-.svc-cart-title {
-  font-size: 13.5px;
-  font-weight: 750;
-  color: var(--text-main);
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-
-.svc-cart-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13px;
-  padding: 6px 0;
-  border-bottom: 1px solid #e2e8f0;
-  color: #475569;
-}
-
-.svc-cart-total {
-  display: flex;
-  justify-content: space-between;
-  font-size: 15px;
-  font-weight: 800;
-  padding-top: 10px;
-  color: var(--text-main);
-}
-
 /* ══════════════════════════════════════════════
    WIDE MODALS & SUB-PANELS
 ══════════════════════════════════════════════ */
@@ -1139,43 +1136,6 @@ textarea.form-control {
   text-align: left;
 }
 
-/* Coupon & Discount styling (Billing) */
-.svc-coupon-input-wrap {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.svc-coupon-pills {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.svc-coupon-chip {
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px dashed var(--primary);
-  background: var(--primary-light);
-  color: var(--primary);
-  font-size: 11.5px;
-  font-weight: 750;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.svc-coupon-chip:hover {
-  background: #ffedd5;
-  transform: translateY(-1px);
-}
-
-.svc-coupon-chip.applied {
-  background: var(--primary);
-  color: #ffffff;
-  border-style: solid;
-}
-
 /* Checkout Tab Buttons inside Modal */
 .svc-checkout-tender-tabs {
   display: flex;
@@ -1210,4 +1170,87 @@ textarea.form-control {
   background: var(--primary-light);
   color: var(--primary);
   box-shadow: 0 0 0 2px rgba(249, 115, 22, 0.2);
+}
+
+/* ══════════════════════════════════════════════
+   PRINT MEDIA STYLES FOR TAKEAWAY BILL
+══════════════════════════════════════════════ */
+@media print {
+  @page {
+    size: auto;
+    margin: 0;
+  }
+
+  /* Hide absolutely everything in root and layout */
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Make sure modal overlays, containers don't create multiple pages */
+  .svc-modal-overlay,
+  .svc-modal-card,
+  .svc-modal-body,
+  .app-container,
+  .main-content,
+  #root {
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Show ONLY the printable receipt element and its children */
+  #takeaway-receipt-print,
+  #takeaway-receipt-print * {
+    visibility: visible !important;
+  }
+
+  #takeaway-receipt-print {
+    position: absolute !important;
+    left: 50% !important;
+    top: 20px !important;
+    transform: translateX(-50%) !important;
+    width: 320px !important;
+    max-width: 320px !important;
+    margin: 0 auto !important;
+    padding: 16px !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid #cbd5e1 !important;
+    border-radius: 8px !important;
+    box-shadow: none !important;
+    font-size: 12px !important;
+    page-break-after: avoid !important;
+    page-break-before: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-before: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Hide modal headers, footers, buttons, toasts, sidebars */
+  .svc-modal-header,
+  .svc-modal-footer,
+  .svc-toast,
+  .sidebar,
+  .topbar,
+  .page-header {
+    display: none !important;
+    visibility: hidden !important;
+  }
 }

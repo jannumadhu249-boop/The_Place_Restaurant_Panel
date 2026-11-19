@@ -318,7 +318,7 @@ export default function Orders() {
     if (!invoicePath) return null;
     if (invoicePath.startsWith('http://') || invoicePath.startsWith('https://')) return invoicePath;
     const clean = invoicePath.replace(/\\/g, '/').replace(/^\/+/, '');
-    const base = URLS.Base || 'http://16.113.133.178:3000/';
+    const base = URLS.Base || 'http://40.192.68.118:3000/';
     const baseWithSlash = base.endsWith('/') ? base : `${base}/`;
     return `${baseWithSlash}${clean}`;
   };
@@ -452,6 +452,7 @@ export default function Orders() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>SL.No</th>
                   <th>Order Ticket</th>
                   <th>Customer & Location</th>
                   <th>Ordered Items</th>
@@ -479,6 +480,7 @@ export default function Orders() {
 
                   return (
                     <tr key={mongoId || orderId}>
+                      <td>{filtered.indexOf(o) + 1}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <strong style={{ fontSize: 13.5, color: 'var(--primary)' }}>

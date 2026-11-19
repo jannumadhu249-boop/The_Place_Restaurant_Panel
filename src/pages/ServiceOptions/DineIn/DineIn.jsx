@@ -1,76 +1,179 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Armchair,
-  Users,
   Clock3,
   IndianRupee,
   Plus,
   Search,
-  Settings2,
   RefreshCw,
   Utensils,
   CalendarCheck,
   ShoppingCart,
-  X,
   CheckCircle2,
-  Minus,
-  Phone,
   UserCheck,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import '../ServiceOps.css';
+import './DineIn.css';
 import SeatGuestsModal from './SeatGuestsModal';
 import CheckoutPaymentModal from './CheckoutPaymentModal';
 import DineInConfigModal from './DineInConfigModal';
+import DineInStatsCards from './DineInStatsCards';
+import ReserveTablePanel from './ReserveTablePanel';
+import OrderFoodPanel from './OrderFoodPanel';
+import SessionOrdersCard from './SessionOrdersCard';
+import { URLS } from '../../../url';
 
-const INITIAL_TABLES = [
-  { id: 'T01', section: 'Main Hall', seats: 2, status: 'available' },
-  { id: 'T02', section: 'Main Hall', seats: 4, status: 'occupied', guest: 'Rahul S.', covers: 3, orderId: 'DIN-1042', since: '12:18' },
-  { id: 'T03', section: 'Main Hall', seats: 4, status: 'reserved', guest: 'Priya P.', covers: 4, reservedFor: '1:00 PM', since: '13:00' },
-  { id: 'T04', section: 'Main Hall', seats: 6, status: 'cleaning' },
-  { id: 'T05', section: 'Patio', seats: 2, status: 'available' },
-  { id: 'T06', section: 'Patio', seats: 4, status: 'occupied', guest: 'Emma W.', covers: 2, orderId: 'DIN-1041', since: '11:52' },
-  { id: 'T07', section: 'Patio', seats: 4, status: 'available' },
-  { id: 'T08', section: 'Private', seats: 8, status: 'reserved', guest: 'Corp Dinner', covers: 8, reservedFor: '7:30 PM', since: '19:30' },
-  { id: 'T09', section: 'Bar', seats: 2, status: 'occupied', guest: 'James L.', covers: 1, orderId: 'DIN-1040', since: '12:05' },
-  { id: 'T10', section: 'Bar', seats: 2, status: 'available' },
-  { id: 'T11', section: 'Main Hall', seats: 4, status: 'available' },
-  { id: 'T12', section: 'Main Hall', seats: 6, status: 'occupied', guest: 'Sophie T.', covers: 5, orderId: 'DIN-1039', since: '11:40' },
-];
+// ── BACKEND ENUMS (dine-in tables) ──────────────────────────────
+const SECTION_LABELS = {
+  main_dining: 'Main Dining',
+  patio: 'Patio',
+  bar_lounge: 'Bar Lounge',
+  private_dining: 'Private Dining',
+  other: 'Other',
+};
 
-const INITIAL_SESSIONS = [
-  { id: 'DIN-1042', table: 'T02', guest: 'Rahul S.', covers: 3, server: 'Ananya', status: 'Serving', amount: 1240, started: '12:18 PM' },
-  { id: 'DIN-1041', table: 'T06', guest: 'Emma W.', covers: 2, server: 'Vikram', status: 'Billing', amount: 890, started: '11:52 AM' },
-  { id: 'DIN-1040', table: 'T09', guest: 'James L.', covers: 1, server: 'Ananya', status: 'Serving', amount: 320, started: '12:05 PM' },
-  { id: 'DIN-1039', table: 'T12', guest: 'Sophie T.', covers: 5, server: 'Meera', status: 'Kitchen', amount: 2180, started: '11:40 AM' },
-];
+const SECTION_OPTIONS = Object.keys(SECTION_LABELS);
 
-const SECTIONS_LIST = ['Main Hall', 'Patio', 'Private', 'Bar'];
+const STATUS_LABELS = {
+  available: 'Available',
+  occupied: 'Occupied',
+  // maintenance: 'Maintenance',
+  // inactive: 'Inactive',
+  reserved: 'Reserved',
+  cleaning: 'Cleaning',
+};
 
-const MENU_ITEMS = [
-  { id: 'm1', name: 'Butter Chicken', category: 'Main Course', price: 420 },
-  { id: 'm2', name: 'Paneer Tikka', category: 'Starters', price: 280 },
-  { id: 'm3', name: 'Garlic Naan', category: 'Breads', price: 80 },
-  { id: 'm4', name: 'Dal Makhani', category: 'Main Course', price: 220 },
-  { id: 'm5', name: 'Chicken Biryani', category: 'Rice', price: 360 },
-  { id: 'm6', name: 'Mango Lassi', category: 'Drinks', price: 120 },
-  { id: 'm7', name: 'Masala Chai', category: 'Drinks', price: 60 },
-  { id: 'm8', name: 'Veg Fried Rice', category: 'Rice', price: 180 },
-  { id: 'm9', name: 'Tandoori Chicken', category: 'Starters', price: 380 },
-  { id: 'm10', name: 'Gulab Jamun', category: 'Desserts', price: 100 },
-  { id: 'm11', name: 'Kulfi', category: 'Desserts', price: 120 },
-  { id: 'm12', name: 'Roti', category: 'Breads', price: 40 },
-];
+const titleCase = (value) =>
+  String(value || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
 
-const MENU_CATEGORIES = ['All', ...new Set(MENU_ITEMS.map((m) => m.category))];
-const AVAILABLE_COUPONS = [
-  { code: 'WELCOME10', type: 'pct', value: 10, label: '10% OFF' },
-  { code: 'FLAT50', type: 'flat', value: 50, label: '₹50 OFF' },
-];
+const formatSection = (section) => SECTION_LABELS[section] || titleCase(section) || 'Other';
+
+// Section can arrive as an enum string or as a populated object
+const normalizeSection = (section) => {
+  if (section && typeof section === 'object') {
+    return String(section.value || section.name || 'other');
+  }
+  return String(section || 'other');
+};
+
+const formatStatus = (status) =>
+  STATUS_LABELS[String(status || '').toLowerCase()] || titleCase(status) || 'Unknown';
+
+const formatTime = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+// ── API RESPONSE MAPPERS ─────────────────────────────────────────
+const mapTable = (t, idx) => {
+  const status = String(t.status || 'available').toLowerCase();
+  return {
+    id: t.tableNumber || t.tableName || `T${String(idx + 1).padStart(2, '0')}`,
+    mongoId: t._id,
+    name: t.tableName || t.tableNumber || '',
+    section: normalizeSection(t.section),
+    sectionLabel: formatSection(normalizeSection(t.section)),
+    seats: Number(t.seatingCapacity || t.capacity || t.seats || 0),
+    status,
+    statusLabel: formatStatus(status),
+    isActive: t.isActive !== false,
+    reservationId:
+      t.reservationId ||
+      t.reservation?._id ||
+      t.currentReservation?._id ||
+      t.activeReservation?._id ||
+      null,
+    raw: t,
+  };
+};
+
+const SESSION_STATUS_MAP = {
+  active: 'Serving',
+  billing: 'Billing',
+  kitchen: 'Kitchen',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+};
+
+const mapSession = (s) => {
+  const tableObj = s.tableId && typeof s.tableId === 'object' ? s.tableId : {};
+  const staffObj =
+    s.assignedStaffId && typeof s.assignedStaffId === 'object' ? s.assignedStaffId : null;
+  const statusRaw = String(s.status || 'active').toLowerCase();
+
+  // The sessions API returns no order code — it comes from the orders API
+  const sessionCode = s.orderUniqueId || s.sessionCode || s.sessionNo || '';
+  const mongoId = s._id ? String(s._id) : '';
+
+  return {
+    id: mongoId || sessionCode,
+    sessionCode,
+    // orderUniqueId of the newest order on this session (filled from the orders API)
+    orderCode: sessionCode,
+    mongoId,
+    sessionType: s.sessionType || '',
+    tableId: tableObj._id || (typeof s.tableId === 'string' ? s.tableId : ''),
+    table: tableObj.tableNumber || tableObj.tableName || s.tableNumber || '—',
+    section: tableObj.section || tableObj.sectionName || s.section || '',
+    sectionLabel: formatSection(tableObj.section || tableObj.sectionName || s.section || ''),
+    guest: s.customerName || s.customer?.name || '',
+    phone: s.customerPhone || s.customer?.phone || '',
+    covers: Number(s.guestCount || 0),
+    server: staffObj?.name || s.server || 'Floor Staff',
+    staffCode: staffObj?.staffCode || '',
+    serverId: staffObj?._id || null,
+    status: SESSION_STATUS_MAP[statusRaw] || formatStatus(statusRaw),
+    statusRaw,
+    amount: s.totalAmount || 0,
+    orderCount: 0,
+    orders: [],
+    paymentStatus: s.paymentStatus || '',
+    paymentMethod: s.paymentMethod || '',
+    notes: s.specialNotes || '',
+    started: formatTime(s.seatedAt || s.logCreatedDate || s.createdAt),
+    seatedAt: s.seatedAt || s.logCreatedDate || s.createdAt || null,
+    raw: s,
+  };
+};
+
+// Page size requested from GET /dine-in/sessions/active
+const SESSION_PAGE_SIZE = 10;
+
+// Overlay the bill, order code and order count reported from the orders API
+const applySummary = (s, meta) => {
+  if (!meta) return s;
+  const amount = typeof meta.total === 'number' && meta.total > 0 ? meta.total : s.amount;
+  const orderCode = meta.orderCode || s.orderCode;
+  const orderCount = Number(meta.orderCount || s.orderCount || 0);
+  const orders = Array.isArray(meta.orders) && meta.orders.length > 0 ? meta.orders : (s.orders || []);
+  if (amount === s.amount && orderCode === s.orderCode && orderCount === s.orderCount && orders === s.orders) {
+    return s;
+  }
+  return { ...s, amount, orderCode, orderCount, orders };
+};
 
 function DineIn() {
-  const [tables, setTables] = useState(INITIAL_TABLES);
-  const [sessions, setSessions] = useState(INITIAL_SESSIONS);
+  const [tables, setTables] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [serversList, setServersList] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState(null);
+  const [statsRefreshKey, setStatsRefreshKey] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSessionsLoading, setIsSessionsLoading] = useState(false);
   const [enabled, setEnabled] = useState(true);
+
+  // Active Floor Sessions pagination
+  const [sessionPage, setSessionPage] = useState(1);
+  const [sessionTotalPages, setSessionTotalPages] = useState(1);
+  const [sessionTotal, setSessionTotal] = useState(0);
+  const [sessionCache, setSessionCache] = useState({});
 
   // Filters
   const [sectionFilter, setSectionFilter] = useState('All');
@@ -86,15 +189,18 @@ function DineIn() {
 
   // Active Session for Checkout
   const [activeCheckoutSession, setActiveCheckoutSession] = useState(null);
+  // Sessions settled in this visit — keeps their orders visible in the completed-orders card
+  const [settledSessionIds, setSettledSessionIds] = useState([]);
+  // Invoices returned by the checkout API, keyed by session id
+  const [settledInvoices, setSettledInvoices] = useState({});
+  // Bill, order code and order count derived from the orders API, keyed by session
+  // mongo id — the sessions payload always reports totalAmount: 0, so this is
+  // re-applied after every refresh instead of re-querying the orders endpoint
+  const sessionSummaryRef = useRef({});
 
   // Table action mode (for right column: 'seat' | 'reserve' | 'order' | null)
   const [actionMode, setActionMode] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
-
-  // Menu / Order state
-  const [menuCategory, setMenuCategory] = useState('All');
-  const [menuSearch, setMenuSearch] = useState('');
-  const [cart, setCart] = useState({});
 
   // Configuration settings
   const [settings, setSettings] = useState({
@@ -108,16 +214,265 @@ function DineIn() {
     defaultSection: 'Main Hall',
   });
 
-  const showToast = (msg) => {
+  const [toastType, setToastType] = useState('success');
+
+  const showToast = (msg, type = 'success') => {
     setToastMessage(msg);
+    setToastType(type);
     setTimeout(() => setToastMessage(''), 3500);
   };
 
-  const sections = useMemo(() => ['All', ...SECTIONS_LIST], []);
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token');
+    const hasToken = token && token !== 'undefined' && token !== 'null' && token.trim() !== '';
+    return {
+      'Content-Type': 'application/json',
+      ...(hasToken ? { Authorization: `Bearer ${token.trim()}` } : {}),
+    };
+  };
+
+  // ── API: AVAILABLE / ALL DINE-IN TABLES ───────────────────────────
+  const fetchTables = useCallback(async () => {
+    try {
+      const params = new URLSearchParams({ page: 1, limit: 100 });
+      const res = await fetch(`${URLS.GetAvailableTables}?${params.toString()}`, {
+        headers: getAuthHeaders(),
+      });
+      const result = await res.json();
+
+      let rawTables = [];
+      if (Array.isArray(result.tables)) rawTables = result.tables;
+      else if (Array.isArray(result.data)) rawTables = result.data;
+      else if (Array.isArray(result.data?.tables)) rawTables = result.data.tables;
+      else if (Array.isArray(result.data?.docs)) rawTables = result.data.docs;
+      else if (Array.isArray(result)) rawTables = result;
+
+      const mappedTables = rawTables.map(mapTable);
+      setTables(mappedTables);
+
+      // Drop cached sessions whose table is no longer occupied
+      // (skipped when the backend does not expose table ids)
+      if (mappedTables.some((t) => t.mongoId)) {
+        const occupiedTableIds = new Set(
+          mappedTables.filter((t) => t.status === 'occupied').map((t) => t.mongoId)
+        );
+        setSessionCache((prev) =>
+          Object.fromEntries(
+            Object.entries(prev).filter(([, s]) => !s.tableId || occupiedTableIds.has(s.tableId))
+          )
+        );
+      }
+    } catch (err) {
+      console.warn('Failed to fetch dine-in tables:', err);
+    }
+  }, []);
+
+  // ── API: ACTIVE DINE-IN SESSIONS & DINE-IN ORDERS ──────────────────
+  const fetchSessions = useCallback(async (targetPage = 1, targetLimit = SESSION_PAGE_SIZE) => {
+    setIsSessionsLoading(true);
+    try {
+      const params = new URLSearchParams({ page: targetPage, limit: targetLimit });
+      const [sessionsRes, ordersRes] = await Promise.all([
+        fetch(`${URLS.GetDineIn}?${params.toString()}`, { headers: getAuthHeaders() }),
+        fetch(URLS.GetDineInOrders, { headers: getAuthHeaders() }).catch(() => null),
+      ]);
+
+      const result = await sessionsRes.json();
+
+      let rawSessions = [];
+      if (Array.isArray(result.sessions)) rawSessions = result.sessions;
+      else if (Array.isArray(result.data)) rawSessions = result.data;
+      else if (Array.isArray(result.data?.sessions)) rawSessions = result.data.sessions;
+      else if (Array.isArray(result.data?.docs)) rawSessions = result.data.docs;
+      else if (Array.isArray(result)) rawSessions = result;
+
+      // Extract all dine-in orders from GET /v1/place/restaurant/dine-in/orders
+      let allOrders = [];
+      if (ordersRes && ordersRes.ok) {
+        const ordersData = await ordersRes.json().catch(() => ({}));
+        if (Array.isArray(ordersData.orders)) allOrders = ordersData.orders;
+        else if (Array.isArray(ordersData.data?.orders)) allOrders = ordersData.data.orders;
+        else if (Array.isArray(ordersData.data)) allOrders = ordersData.data;
+        else if (Array.isArray(ordersData)) allOrders = ordersData;
+      }
+
+      // Build session-to-order map and calculate bill / latest order codes
+      const orderSummaryBySession = {};
+      allOrders.forEach((o) => {
+        const sId = String(o.session?._id || o.sessionId || '');
+        const tableNum = o.table?.tableNumber || o.table?.tableName || '';
+        const orderAmount = Number(o.totalAmount ?? o.booking?.totalAmount ?? 0);
+        const orderCode = o.orderUniqueId || o.booking?.orderUniqueId || '';
+        const created = o.booking?.logCreatedDate || o.createdAt || '';
+
+        const keys = [sId, tableNum].filter(Boolean);
+        keys.forEach((key) => {
+          if (!orderSummaryBySession[key]) {
+            orderSummaryBySession[key] = {
+              total: 0,
+              orderCode: '',
+              newestDate: '',
+              orderCount: 0,
+              orders: [],
+            };
+          }
+          orderSummaryBySession[key].total += orderAmount;
+          orderSummaryBySession[key].orderCount += 1;
+          orderSummaryBySession[key].orders.push(o);
+          if (!orderSummaryBySession[key].newestDate || created > orderSummaryBySession[key].newestDate) {
+            orderSummaryBySession[key].newestDate = created;
+            orderSummaryBySession[key].orderCode = orderCode;
+          }
+        });
+      });
+
+      // Update session summary cache
+      sessionSummaryRef.current = {
+        ...sessionSummaryRef.current,
+        ...orderSummaryBySession,
+      };
+
+      const mapped = rawSessions.map(mapSession);
+      // Re-apply the order-derived bill and order code
+      const enriched = mapped.map((s) => {
+        const summary =
+          orderSummaryBySession[s.mongoId] ||
+          orderSummaryBySession[s.table] ||
+          sessionSummaryRef.current[s.mongoId] ||
+          sessionSummaryRef.current[s.table];
+        return applySummary(s, summary);
+      });
+
+      // Backend may or may not paginate — handle both shapes
+      const pg = result.pagination || result.meta || result.data?.pagination || {};
+      const isServerPaginated =
+        pg.totalRecords !== undefined ||
+        pg.total !== undefined ||
+        pg.totalPages !== undefined ||
+        result.total !== undefined ||
+        result.totalPages !== undefined;
+
+      if (isServerPaginated) {
+        const total = Number(pg.totalRecords ?? pg.total ?? result.total ?? enriched.length);
+        const pages = Number(
+          pg.totalPages ?? result.totalPages ?? Math.max(1, Math.ceil(total / targetLimit))
+        );
+        setSessions(enriched);
+        setSessionTotal(total);
+        setSessionTotalPages(Math.max(1, pages));
+        setSessionPage(Number(pg.currentPage ?? pg.page ?? result.currentPage ?? targetPage));
+      } else {
+        // Unpaginated payload — slice the requested window client-side
+        const total = enriched.length;
+        const pages = Math.max(1, Math.ceil(total / targetLimit));
+        const safePage = Math.min(Math.max(1, targetPage), pages);
+        const start = (safePage - 1) * targetLimit;
+        setSessions(enriched.slice(start, start + targetLimit));
+        setSessionTotal(total);
+        setSessionTotalPages(pages);
+        setSessionPage(safePage);
+      }
+
+      // Remember every session fetched so off-page tables still resolve their details
+      setSessionCache((prev) => {
+        const next = { ...prev };
+        enriched.forEach((s) => {
+          next[s.mongoId || s.id] = s;
+        });
+        return next;
+      });
+    } catch (err) {
+      console.warn('Failed to fetch active dine-in sessions:', err);
+    } finally {
+      setIsSessionsLoading(false);
+    }
+  }, []);
+
+  // ── API: ACTIVE CAPTAINS / SERVERS ──────────────────────────
+  const fetchServers = useCallback(async () => {
+    try {
+      const res = await fetch(URLS.GetActiveServers, { headers: getAuthHeaders() });
+      if (!res.ok) return;
+      const result = await res.json();
+
+      let rawStaff = [];
+      if (Array.isArray(result.captains)) rawStaff = result.captains;
+      else if (Array.isArray(result.data)) rawStaff = result.data;
+      else if (Array.isArray(result.staff)) rawStaff = result.staff;
+      else if (Array.isArray(result.data?.captains)) rawStaff = result.data.captains;
+      else if (Array.isArray(result)) rawStaff = result;
+
+      setServersList(
+        rawStaff.map((c) => ({
+          id: c._id,
+          name: c.name || c.staffCode || 'Captain',
+          staffCode: c.staffCode || '',
+          role: c.role || '',
+          phone: c.phone || '',
+        }))
+      );
+    } catch (err) {
+      console.warn('Failed to fetch active servers:', err);
+    }
+  }, []);
+
+  // ── DASHBOARD CARDS LIFTED UP FROM <DineInStatsCards /> ──────────
+  const handleDashboardLoaded = useCallback((dashboard) => {
+    setDashboardStats(dashboard);
+    if (typeof dashboard?.dineInEnabled === 'boolean') setEnabled(dashboard.dineInEnabled);
+  }, []);
+
+  // Re-fetch floor plan + sessions (back to page 1), then ask the stats cards to refresh
+  const refreshDineIn = useCallback(async () => {
+    setIsLoading(true);
+    await Promise.all([fetchTables(), fetchSessions(1, SESSION_PAGE_SIZE)]);
+    setSessionPage(1);
+    setStatsRefreshKey((k) => k + 1);
+    setIsLoading(false);
+  }, [fetchTables, fetchSessions]);
+
+  // Initial load (dashboard cards fetch themselves inside <DineInStatsCards />)
+  useEffect(() => {
+    fetchTables();
+    fetchSessions(1, SESSION_PAGE_SIZE);
+    fetchServers();
+  }, [fetchTables, fetchSessions, fetchServers]);
+
+  // Always expose every known section so the filter is never limited to
+  // whatever sections happen to have tables at the moment
+  const sections = useMemo(() => {
+    const present = new Set(tables.map((t) => t.section).filter(Boolean));
+    const extras = Array.from(present).filter((s) => !SECTION_OPTIONS.includes(s));
+    return ['All', ...SECTION_OPTIONS, ...extras];
+  }, [tables]);
+
+  // Sessions seen across pages, joined onto the floor plan / action panel
+  const knownSessions = useMemo(() => {
+    const merged = new Map();
+    Object.values(sessionCache).forEach((s) => merged.set(s.mongoId || s.id, s));
+    sessions.forEach((s) => merged.set(s.mongoId || s.id, s));
+    return Array.from(merged.values());
+  }, [sessionCache, sessions]);
+
+  // Join active sessions onto their tables so the floor plan shows guest / covers / session
+  const tablesWithSessions = useMemo(() => {
+    return tables.map((t) => {
+      const s = knownSessions.find((x) => x.tableId === t.mongoId || x.table === t.id);
+      if (!s) return t;
+      return {
+        ...t,
+        guest: s.guest,
+        covers: s.covers,
+        orderId: s.orderCode || '',
+        since: s.started,
+        session: s,
+      };
+    });
+  }, [tables, knownSessions]);
 
   const selectedTableData = useMemo(
-    () => tables.find((t) => t.id === selectedTable),
-    [tables, selectedTable]
+    () => tablesWithSessions.find((t) => t.id === selectedTable),
+    [tablesWithSessions, selectedTable]
   );
 
   const availableTables = useMemo(
@@ -126,49 +481,36 @@ function DineIn() {
   );
 
   const filteredTables = useMemo(() => {
-    return tables.filter((t) => {
+    return tablesWithSessions.filter((t) => {
       const matchSection = sectionFilter === 'All' || t.section === sectionFilter;
       const matchStatus = statusFilter === 'All' || t.status === statusFilter;
       const q = search.trim().toLowerCase();
       const matchSearch =
         !q ||
-        t.id.toLowerCase().includes(q) ||
-        t.section.toLowerCase().includes(q) ||
+        String(t.id || '').toLowerCase().includes(q) ||
+        String(t.sectionLabel || '').toLowerCase().includes(q) ||
         (t.guest && t.guest.toLowerCase().includes(q));
       return matchSection && matchStatus && matchSearch;
     });
-  }, [tables, sectionFilter, statusFilter, search]);
+  }, [tablesWithSessions, sectionFilter, statusFilter, search]);
 
+  // Cards come from the dine-in dashboard API, with a floor-plan fallback
   const stats = useMemo(() => {
-    const occupied = tables.filter((t) => t.status === 'occupied').length;
-    const reserved = tables.filter((t) => t.status === 'reserved').length;
-    const available = tables.filter((t) => t.status === 'available').length;
+    const d = dashboardStats || {};
+    const occupiedCount = tables.filter((t) => t.status === 'occupied').length;
+    const availableCount = tables.filter((t) => t.status === 'available').length;
     const totalAmount = sessions.reduce((s, it) => s + (it.amount || 0), 0);
-    return { occupied, reserved, available, totalAmount, activeSessions: sessions.length };
-  }, [tables, sessions]);
 
-  const filteredMenu = useMemo(() => {
-    return MENU_ITEMS.filter((m) => {
-      const catOk = menuCategory === 'All' || m.category === menuCategory;
-      const q = menuSearch.trim().toLowerCase();
-      const searchOk = !q || m.name.toLowerCase().includes(q);
-      return catOk && searchOk;
-    });
-  }, [menuCategory, menuSearch]);
-
-  const cartItems = useMemo(() => {
-    return Object.entries(cart)
-      .filter(([, qty]) => qty > 0)
-      .map(([id, qty]) => {
-        const item = MENU_ITEMS.find((m) => m.id === id);
-        return { ...item, qty, subtotal: item.price * qty };
-      });
-  }, [cart]);
-
-  const cartTotal = useMemo(
-    () => cartItems.reduce((s, i) => s + i.subtotal, 0),
-    [cartItems]
-  );
+    return {
+      activeSessions: Number(d.activeSessions ?? sessions.length),
+      available: Number(d.availableTables ?? availableCount),
+      reserved: Number(d.reserved ?? 0),
+      occupied: Number(d.occupiedTables ?? occupiedCount),
+      openChecks: Number(d.openChecks ?? sessions.length),
+      totalAmount: Number(d.openChecksAmount ?? totalAmount),
+      totalTables: Number(d.totalTables ?? tables.length),
+    };
+  }, [tables, sessions, dashboardStats]);
 
   const money = (n) =>
     `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -180,18 +522,6 @@ function DineIn() {
     return 'badge-success';
   };
 
-  const changeQty = (id, delta) => {
-    setCart((prev) => {
-      const current = prev[id] || 0;
-      const next = Math.max(0, current + delta);
-      if (next === 0) {
-        const { [id]: _, ...rest } = prev;
-        return rest;
-      }
-      return { ...prev, [id]: next };
-    });
-  };
-
   const handleTableClick = (tableId) => {
     if (selectedTable === tableId) {
       setSelectedTable(null);
@@ -199,7 +529,6 @@ function DineIn() {
     } else {
       setSelectedTable(tableId);
       setActionMode(null);
-      setCart({});
     }
   };
 
@@ -209,42 +538,68 @@ function DineIn() {
     setIsSeatModalOpen(true);
   };
 
-  const handleConfirmSeat = ({ table, guest, phone, covers, server, notes }) => {
-    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const newSessionId = `DIN-${1040 + sessions.length + 1}`;
+  // Called by <SeatGuestsModal /> after it successfully creates the session
+  const handleSeated = async ({ table, covers, guest }) => {
+    setIsSeatModalOpen(false);
+    if (table) setSelectedTable(table);
+    setActionMode(null);
+    showToast(`✓ ${guest || 'Walk-in Guest'} seated at Table ${table} · ${covers} covers!`);
+    await refreshDineIn();
+  };
 
+  // ── RESERVE TABLE ───────────────────────────────────────────────────
+  // Called by <ReserveTablePanel /> after the reservation was created via the API
+  const handleReserveTable = ({ tableId, guest, phone, covers, reserveDate, reserveTime, reservation }) => {
     setTables((prev) =>
-      prev.map((t) =>
-        t.id === table
+      prev.map((tab) =>
+        tab.id === tableId
           ? {
-              ...t,
-              status: 'occupied',
+              ...tab,
+              status: 'reserved',
+              statusLabel: formatStatus('reserved'),
               guest,
+              phone,
               covers,
-              orderId: newSessionId,
-              since: nowTime,
+              reservedFor: reserveTime,
+              reservedOn: reserveDate,
+              reservationId:
+                reservation?._id ||
+                reservation?.reservationId ||
+                tab.reservationId ||
+                null,
             }
-          : t
+          : tab
       )
     );
+    setActionMode(null);
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const when = reserveDate && reserveDate !== todayStr ? `${reserveDate} at ${reserveTime}` : reserveTime;
+    showToast(`✓ Table ${tableId} reserved for ${guest} · ${when}.`);
+  };
 
-    setSessions((prev) => [
-      {
-        id: newSessionId,
-        table,
-        guest,
-        covers,
-        server,
-        status: 'Serving',
-        amount: 850,
-        started: nowTime,
-      },
-      ...prev,
-    ]);
-
-    setIsSeatModalOpen(false);
-    setSelectedTable(table);
-    showToast(`✓ Guests seated at Table ${table} (${newSessionId})!`);
+  // Called by <ReserveTablePanel /> after the reservation was cancelled via the API
+  const handleReservationCancelled = ({ tableId }) => {
+    setTables((prev) =>
+      prev.map((tab) =>
+        tab.id === tableId
+          ? {
+              ...tab,
+              status: 'available',
+              statusLabel: formatStatus('available'),
+              guest: '',
+              phone: '',
+              covers: 0,
+              reservedFor: '',
+              reservedOn: '',
+              reservationId: null,
+            }
+          : tab
+      )
+    );
+    setActionMode(null);
+    showToast(`✓ Reservation cancelled — Table ${tableId} is now available.`);
+    refreshDineIn();
   };
 
   // ── BILLING & CHECKOUT MODAL ────────────────────────────────────────
@@ -253,12 +608,33 @@ function DineIn() {
     setIsBillCheckoutModalOpen(true);
   };
 
-  const handleCompleteCheckout = ({ table, sessionId, grandTotal, payMethod }) => {
-    setSessions((prev) => prev.filter((s) => s.id !== sessionId));
+  const handleCompleteCheckout = ({ table, sessionId, grandTotal, payMethod, invoice }) => {
+    setSettledSessionIds((prev) =>
+      prev.includes(String(sessionId)) ? prev : [...prev, String(sessionId)]
+    );
+    if (invoice) {
+      setSettledInvoices((prev) => ({ ...prev, [String(sessionId)]: invoice }));
+    }
+    const matchesSession = (s) => String(s.mongoId || s.id) === String(sessionId);
+    const remaining = sessions.filter((s) => !matchesSession(s));
+    setSessions(remaining);
+    setSessionCache((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([, s]) => !matchesSession(s)))
+    );
+    setSessionTotal((n) => Math.max(0, n - 1));
     setTables((prev) =>
       prev.map((t) =>
         t.id === table
-          ? { id: t.id, section: t.section, seats: t.seats, status: 'available' }
+          ? {
+            ...t,
+            status: 'available',
+            statusLabel: formatStatus('available'),
+            guest: '',
+            covers: 0,
+            orderId: '',
+            since: '',
+            session: null,
+          }
           : t
       )
     );
@@ -266,40 +642,156 @@ function DineIn() {
     setIsBillCheckoutModalOpen(false);
     setActiveCheckoutSession(null);
     showToast(`✓ Bill settled for Table ${table}! Payment of ${money(grandTotal)} collected via ${payMethod}.`);
+
+    // Pull the next page into view when the last row of this page was settled
+    if (remaining.length === 0 && sessionPage > 1) {
+      const prevPage = sessionPage - 1;
+      setSessionPage(prevPage);
+      fetchSessions(prevPage, SESSION_PAGE_SIZE);
+    }
   };
 
-  // Order Placement
-  const handlePlaceOrder = () => {
-    if (cartItems.length === 0) return;
-    const t = selectedTableData;
-    if (!t) return;
+  // Real bill, order code and order count per session, reported by <SessionOrdersCard />
+  // from the orders API — the sessions payload always reports totalAmount: 0
+  const handleSessionSummary = useCallback((summary) => {
+    if (!summary || Object.keys(summary).length === 0) return;
 
-    setSessions((prev) =>
-      prev.map((s) =>
-        s.table === t.id
-          ? { ...s, amount: (s.amount || 0) + cartTotal, status: 'Serving' }
-          : s
-      )
+    // Remembered so the next sessions refresh re-applies it instead of resetting to ₹0
+    sessionSummaryRef.current = { ...sessionSummaryRef.current, ...summary };
+
+    setSessions((prev) => {
+      let changed = false;
+      const next = prev.map((s) => {
+        const patched = applySummary(s, summary[String(s.mongoId)]);
+        if (patched !== s) changed = true;
+        return patched;
+      });
+      return changed ? next : prev;
+    });
+
+    setSessionCache((prev) => {
+      let changed = false;
+      const next = Object.fromEntries(
+        Object.entries(prev).map(([key, s]) => {
+          const patched = applySummary(s, summary[String(s.mongoId)]);
+          if (patched !== s) changed = true;
+          return [key, patched];
+        })
+      );
+      return changed ? next : prev;
+    });
+  }, []);
+
+  // Order Placement — called by <OrderFoodPanel /> after the order API succeeds
+  const handleOrderPlaced = async ({ sessionId, tableId, items, total, orderCode }) => {
+    const matchesSession = (s) =>
+      sessionId ? String(s.mongoId || s.id) === String(sessionId) : s.table === tableId;
+
+    // Keep the derived bill in sync, otherwise the next sessions refresh resets it to ₹0
+    const targetSession = sessions.find(matchesSession) || sessionCache[String(sessionId)];
+    const summaryId = String(targetSession?.mongoId || sessionId || '');
+    if (summaryId) {
+      const prev = sessionSummaryRef.current[summaryId] || {
+        total: 0,
+        orderCode: '',
+        orderCount: 0,
+      };
+      sessionSummaryRef.current = {
+        ...sessionSummaryRef.current,
+        [summaryId]: {
+          total: prev.total + Number(total || 0),
+          orderCode: orderCode || prev.orderCode,
+          orderCount: prev.orderCount + 1,
+        },
+      };
+    }
+
+    const addToBill = (s) =>
+      matchesSession(s)
+        ? {
+            ...s,
+            amount: (s.amount || 0) + Number(total || 0),
+            orderCount: (s.orderCount || 0) + 1,
+            status: 'Serving',
+            ...(orderCode ? { orderCode } : {}),
+          }
+        : s;
+
+    setSessions((prev) => prev.map(addToBill));
+    setSessionCache((prev) =>
+      Object.fromEntries(Object.entries(prev).map(([key, s]) => [key, addToBill(s)]))
     );
 
-    showToast(`✓ Added ${cartItems.length} items (${money(cartTotal)}) to Table ${t.id}!`);
-    setCart({});
+    showToast(`✓ Added ${items.length} items (${money(total)}) to Table ${tableId}!`);
     setActionMode(null);
+
+    // Re-sync the session bill with the backend
+    await refreshDineIn();
   };
+
+  // ── ACTIVE FLOOR SESSIONS PAGINATION ────────────────────────────────
+  const handleSessionPageChange = (newPage) => {
+    if (newPage < 1 || newPage > sessionTotalPages || newPage === sessionPage) return;
+    setSessionPage(newPage);
+    fetchSessions(newPage, SESSION_PAGE_SIZE);
+  };
+
+  const getPageNumbers = (currentPage, total) => {
+    if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+    if (currentPage <= 3) return [1, 2, 3, 4, '...', total];
+    if (currentPage >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+    return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', total];
+  };
+
+  const sessionStartItem = sessionTotal === 0 ? 0 : (sessionPage - 1) * SESSION_PAGE_SIZE + 1;
+  const sessionEndItem = Math.min(sessionPage * SESSION_PAGE_SIZE, sessionTotal);
 
   const updateTableStatus = (tableId, nextStatus) => {
     setTables((prev) =>
-      prev.map((t) => {
-        if (t.id === tableId) {
-          if (nextStatus === 'available') {
-            return { id: t.id, section: t.section, seats: t.seats, status: 'available' };
-          }
-          return { ...t, status: nextStatus };
-        }
-        return t;
-      })
+      prev.map((t) =>
+        t.id === tableId
+          ? { ...t, status: nextStatus, statusLabel: formatStatus(nextStatus) }
+          : t
+      )
     );
-    showToast(`✓ Table ${tableId} marked as ${nextStatus}.`);
+    if (nextStatus === 'available') {
+      const hadSession = knownSessions.some((s) => s.table === tableId);
+      setSessions((prev) => prev.filter((s) => s.table !== tableId));
+      setSessionCache((prev) =>
+        Object.fromEntries(Object.entries(prev).filter(([, s]) => s.table !== tableId))
+      );
+      if (hadSession) setSessionTotal((n) => Math.max(0, n - 1));
+    }
+    showToast(`✓ Table ${tableId} marked as ${formatStatus(nextStatus)}.`);
+  };
+
+  // ── ENABLE / DISABLE DINE-IN SERVICE ───────────────────────────────
+  const handleToggleService = async () => {
+    const nextState = !enabled;
+    setEnabled(nextState);
+    try {
+      const res = await fetch(URLS.EnableDineIn, {
+        method: 'PUT',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isEnabled: nextState }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.success === false || data.status === false) {
+        setEnabled(!nextState);
+        showToast(data.message || 'Failed to update dine-in status.', 'error');
+        return;
+      }
+
+      showToast(
+        nextState ? '✓ Dine-in service is now ENABLED' : 'Dine-in service is now DISABLED'
+      );
+      setStatsRefreshKey((k) => k + 1);
+    } catch (err) {
+      console.error('Error toggling dine-in status:', err);
+      setEnabled(!nextState);
+      showToast('Network error while toggling service.', 'error');
+    }
   };
 
   // ── RIGHT COLUMN ACTION PANEL RENDERER ───────────────────────────────
@@ -333,167 +825,30 @@ function DineIn() {
 
     const t = selectedTableData;
 
-    // ORDER FOOD PANEL
+    // ORDER FOOD PANEL (separated component — owns categories + menu API)
     if (actionMode === 'order') {
       return (
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">
-                <ShoppingCart size={17} style={{ verticalAlign: 'middle', marginRight: 6, color: 'var(--primary)' }} />
-                Menu Order — {t.id} ({t.guest || 'Guest'})
-              </h2>
-              <p style={{ fontSize: 12.5, color: '#64748b' }}>Select dishes & drinks</p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ padding: '6px 12px', fontSize: 12 }}
-              onClick={() => { setActionMode(null); setCart({}); }}
-            >
-              <X size={14} /> Close
-            </button>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-            <div className="svc-input-with-icon" style={{ flex: 1 }}>
-              <Search size={15} className="svc-input-icon" />
-              <input
-                className="form-control"
-                placeholder="Search food item…"
-                value={menuSearch}
-                onChange={(e) => setMenuSearch(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="svc-menu-cats">
-            {MENU_CATEGORIES.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className={`svc-menu-cat-btn ${menuCategory === c ? 'active' : ''}`}
-                onClick={() => setMenuCategory(c)}
-              >
-                {c}
-              </button>
-            ))}
-          </div>
-
-          <div className="svc-menu-grid">
-            {filteredMenu.map((item) => {
-              const qty = cart[item.id] || 0;
-              return (
-                <div key={item.id} className="svc-menu-item">
-                  <div className="svc-menu-item-top">
-                    <div>
-                      <div className="svc-menu-item-name">{item.name}</div>
-                      <div className="svc-menu-item-cat">{item.category}</div>
-                    </div>
-                    <div className="svc-menu-item-price">{money(item.price)}</div>
-                  </div>
-                  <div className="svc-menu-item-qty">
-                    {qty === 0 ? (
-                      <button
-                        type="button"
-                        className="btn btn-primary"
-                        style={{ fontSize: 12, padding: '6px 14px', width: '100%', justifyContent: 'center' }}
-                        onClick={() => changeQty(item.id, 1)}
-                      >
-                        <Plus size={13} /> Add
-                      </button>
-                    ) : (
-                      <div className="svc-qty-ctrl">
-                        <button type="button" className="svc-qty-btn" onClick={() => changeQty(item.id, -1)}>
-                          <Minus size={13} />
-                        </button>
-                        <span className="svc-qty-val">{qty}</span>
-                        <button type="button" className="svc-qty-btn add" onClick={() => changeQty(item.id, 1)}>
-                          <Plus size={13} />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {cartItems.length > 0 && (
-            <div className="svc-cart-summary">
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
-                <span style={{ color: '#64748b' }}>Items ({cartItems.reduce((s, i) => s + i.qty, 0)})</span>
-                <strong>{money(cartTotal)}</strong>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary"
-                style={{ width: '100%', justifyContent: 'center', marginTop: 10 }}
-                onClick={handlePlaceOrder}
-              >
-                <Plus size={16} /> Send to Kitchen ({money(cartTotal)})
-              </button>
-            </div>
-          )}
-        </div>
+        <OrderFoodPanel
+          table={t}
+          session={t.session}
+          onClose={() => setActionMode(null)}
+          onOrderPlaced={handleOrderPlaced}
+          isDisabled={!enabled}
+        />
       );
     }
 
-    // RESERVE TABLE PANEL
+    // RESERVE TABLE PANEL (separated component — create or cancel a reservation)
     if (actionMode === 'reserve') {
       return (
-        <div className="card">
-          <div className="card-header">
-            <div>
-              <h2 className="card-title">Reserve Table {t.id}</h2>
-              <p style={{ fontSize: 12.5, color: '#64748b' }}>{t.section} · {t.seats} seats</p>
-            </div>
-            <button
-              type="button"
-              className="btn btn-outline"
-              style={{ padding: '6px 12px', fontSize: 12 }}
-              onClick={() => setActionMode(null)}
-            >
-              <X size={14} /> Close
-            </button>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              setTables((prev) =>
-                prev.map((tab) =>
-                  tab.id === t.id
-                    ? { ...tab, status: 'reserved', guest: 'Reserved Guest', reservedFor: '7:30 PM' }
-                    : tab
-                )
-              );
-              setActionMode(null);
-              showToast(`✓ Table ${t.id} reserved successfully!`);
-            }}
-          >
-            <div className="form-grid" style={{ gridTemplateColumns: '1fr', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Guest name</label>
-                <input className="form-control" placeholder="Reservation guest name" required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Phone number</label>
-                <input className="form-control" placeholder="+91 98765 43210" required />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Covers</label>
-                <input type="number" min={1} max={t.seats} className="form-control" defaultValue={2} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Reservation time</label>
-                <input type="time" className="form-control" defaultValue="19:30" />
-              </div>
-              <button type="submit" className="btn btn-primary" style={{ width: '100%', justifyContent: 'center' }}>
-                <CalendarCheck size={15} /> Confirm Reservation
-              </button>
-            </div>
-          </form>
-        </div>
+        <ReserveTablePanel
+          table={t}
+          reservationId={t.reservationId || ''}
+          onClose={() => setActionMode(null)}
+          onConfirm={handleReserveTable}
+          onCancelled={handleReservationCancelled}
+          isDisabled={!enabled}
+        />
       );
     }
 
@@ -502,17 +857,19 @@ function DineIn() {
       available: { label: 'Available', bg: '#ecfdf5', color: '#059669', border: '#a7f3d0' },
       occupied: { label: 'Occupied', bg: '#fff7ed', color: '#ea580c', border: '#fed7aa' },
       reserved: { label: 'Reserved', bg: '#eff6ff', color: '#2563eb', border: '#bfdbfe' },
+      // maintenance: { label: 'Maintenance', bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
+      // inactive: { label: 'Inactive', bg: '#f8fafc', color: '#94a3b8', border: '#e2e8f0' },
       cleaning: { label: 'Cleaning', bg: '#f8fafc', color: '#64748b', border: '#e2e8f0' },
     };
     const sb = statusBadges[t.status] || statusBadges.available;
-    const sessionObj = sessions.find((s) => s.table === t.id);
+    const sessionObj = knownSessions.find((s) => s.table === t.id);
 
     return (
       <div className="card">
         <div className="card-header">
           <div>
             <h2 className="card-title">Table {t.id}</h2>
-            <p style={{ fontSize: 12.5, color: '#64748b' }}>{t.section} · {t.seats} seats</p>
+            <p style={{ fontSize: 12.5, color: '#64748b' }}>{t.sectionLabel || formatSection(t.section)} · {t.seats} seats</p>
           </div>
           <span
             style={{
@@ -562,10 +919,10 @@ function DineIn() {
                 <strong style={{ color: '#0f172a' }}>{t.covers} persons</strong>
               </div>
             )}
-            {t.orderId && t.orderId !== '—' && (
+            {t.orderId && (
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 8 }}>
-                <span style={{ color: '#64748b' }}>Session</span>
-                <strong style={{ color: '#0f172a' }}>{t.orderId}</strong>
+                <span style={{ color: '#64748b' }}>Order</span>
+                <strong style={{ color: '#0f172a' }}>{sessionObj?.orderCode || t.orderId}</strong>
               </div>
             )}
             {t.since && (
@@ -615,7 +972,7 @@ function DineIn() {
                 type="button"
                 className="btn btn-primary"
                 style={{ justifyContent: 'center' }}
-                onClick={() => { setActionMode('order'); setMenuCategory('All'); setMenuSearch(''); }}
+                onClick={() => setActionMode('order')}
               >
                 <ShoppingCart size={15} /> Add Food / Drinks
               </button>
@@ -655,7 +1012,7 @@ function DineIn() {
                 type="button"
                 className="btn btn-outline"
                 style={{ justifyContent: 'center', color: '#ef4444', borderColor: '#fecaca' }}
-                onClick={() => updateTableStatus(t.id, 'available')}
+                onClick={() => setActionMode('reserve')}
               >
                 Cancel Reservation
               </button>
@@ -692,8 +1049,8 @@ function DineIn() {
           </p>
         </div>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-outline" onClick={() => window.location.reload()}>
-            <RefreshCw size={15} /> Refresh
+          <button type="button" className="btn btn-outline" onClick={refreshDineIn} disabled={isLoading}>
+            <RefreshCw size={15} /> {isLoading ? 'Refreshing…' : 'Refresh'}
           </button>
           {/* <button
             type="button"
@@ -726,52 +1083,19 @@ function DineIn() {
           type="button"
           className={`svc-switch ${enabled ? 'on' : ''}`}
           aria-pressed={enabled}
-          onClick={() => setEnabled((v) => !v)}
+          onClick={handleToggleService}
           title={enabled ? 'Dine-in Enabled' : 'Dine-in Disabled'}
         >
           <span className="svc-switch-knob" />
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="stats-grid" style={{ marginBottom: 22 }}>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fff7ed', color: '#ea580c' }}>
-            <Utensils size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Active Sessions</div>
-            <div className="stat-value">{stats.activeSessions}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ecfdf5', color: '#059669' }}>
-            <Armchair size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Available Tables</div>
-            <div className="stat-value">{stats.available}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#eff6ff', color: '#2563eb' }}>
-            <Clock3 size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Reserved</div>
-            <div className="stat-value">{stats.reserved}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fef3c7', color: '#d97706' }}>
-            <IndianRupee size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Open Checks</div>
-            <div className="stat-value">{money(stats.totalAmount)}</div>
-          </div>
-        </div>
-      </div>
+      {/* Stats Cards — fetch their own dashboard data */}
+      <DineInStatsCards
+        refreshKey={statsRefreshKey}
+        onDashboardLoaded={handleDashboardLoaded}
+        money={money}
+      />
 
       {/* Main Floor & Right Action Column Grid */}
       <div className="svc-section-grid">
@@ -780,27 +1104,78 @@ function DineIn() {
           <div className="card-header">
             <div>
               <h2 className="card-title">Floor & Tables</h2>
-              <p style={{ fontSize: 12.5, color: '#64748b' }}>
+              {/* <p style={{ fontSize: 12.5, color: '#64748b' }}>
                 Occupied {stats.occupied} · Reserved {stats.reserved} · Available {stats.available}
-              </p>
+              </p> */}
             </div>
           </div>
 
           {/* Legend */}
-          <div className="svc-legend">
-            <span className="svc-legend-item">
-              <span className="svc-legend-dot available" /> Available
+
+          <div
+            className="svc-legend"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: '7px',
+              padding: '5px 10px',
+              fontSize: 12.5,
+              color: '#15803d',
+              borderRadius: 6,
+              background: 'transparent',
+              border: 'none',
+            }}
+          >
+            <span className="svc-legend-item" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 12px', borderRadius: 8,
+              background: '#f0fdf4', border: '1px solid #bbf7d0',
+              color: '#15803d', fontWeight: 500
+            }}>
+              <span className="svc-legend-dot" style={{
+                width: 8, height: 8, borderRadius: '50%', background: '#22c55e'
+              }} />
+              Available <strong>{stats.available}</strong>
             </span>
-            <span className="svc-legend-item">
-              <span className="svc-legend-dot occupied" /> Occupied
+
+            <span className="svc-legend-item" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 12px', borderRadius: 8,
+              background: '#fef2f2', border: '1px solid #fecaca',
+              color: '#b91c1c', fontWeight: 500
+            }}>
+              <span className="svc-legend-dot" style={{
+                width: 8, height: 8, borderRadius: '50%', background: '#ef4444'
+              }} />
+              Occupied <strong>{stats.occupied}</strong>
             </span>
-            <span className="svc-legend-item">
-              <span className="svc-legend-dot reserved" /> Reserved
+
+            <span className="svc-legend-item" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 12px', borderRadius: 8,
+              background: '#fffbeb', border: '1px solid #fde68a',
+              color: '#a16207', fontWeight: 500
+            }}>
+              <span className="svc-legend-dot" style={{
+                width: 8, height: 8, borderRadius: '50%', background: '#f59e0b'
+              }} />
+              Reserved <strong>{stats.reserved}</strong>
             </span>
-            <span className="svc-legend-item">
-              <span className="svc-legend-dot cleaning" /> Cleaning
+
+            <span className="svc-legend-item" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              padding: '7px 12px', borderRadius: 8,
+              background: '#eff6ff', border: '1px solid #bfdbfe',
+              color: '#1d4ed8', fontWeight: 500
+            }}>
+              <span className="svc-legend-dot" style={{
+                width: 8, height: 8, borderRadius: '50%', background: '#3b82f6'
+              }} />
+              Cleaning <strong>{stats.cleaning}</strong>
             </span>
           </div>
+
 
           {/* Search & Filters */}
           <div className="form-grid" style={{ marginBottom: 18, gridTemplateColumns: '1.2fr 1fr 1fr', gap: 12 }}>
@@ -824,7 +1199,7 @@ function DineIn() {
                 onChange={(e) => setSectionFilter(e.target.value)}
               >
                 {sections.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{s === 'All' ? 'All Sections' : formatSection(s)}</option>
                 ))}
               </select>
             </div>
@@ -857,7 +1232,7 @@ function DineIn() {
                   tabIndex={0}
                 >
                   <div className="svc-table-no">{t.id}</div>
-                  <div className="svc-table-sec">{t.section}</div>
+                  <div className="svc-table-sec">{t.sectionLabel || formatSection(t.section)}</div>
                   <div className="svc-table-seats">{t.seats} seats</div>
 
                   {t.guest && (
@@ -875,6 +1250,11 @@ function DineIn() {
                 </div>
               );
             })}
+            {filteredTables.length === 0 && (
+              <div style={{ gridColumn: '1 / -1', padding: '18px 14px', background: '#f8fafc', borderRadius: 10, fontSize: 13, color: '#64748b', textAlign: 'center', border: '1px dashed #cbd5e1' }}>
+                No tables found for the selected filters.
+              </div>
+            )}
           </div>
 
           {!selectedTable && (
@@ -892,15 +1272,16 @@ function DineIn() {
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="card-header">
           <div>
-            <h2 className="card-title">Active Floor Sessions</h2>
-            <p style={{ fontSize: 12.5, color: '#64748b' }}>Live orders and ongoing customer dining</p>
+            <h2 className="card-title">Active Dine-in Orders</h2>
+            <p style={{ fontSize: 12.5,marginTop: 4, color: '#64748b' }}>Live orders and ongoing customer dining</p>
           </div>
         </div>
         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
-                <th>Session</th>
+                <th>SL.No</th>
+                <th>Order</th>
                 <th>Table</th>
                 <th>Guest</th>
                 <th>Covers</th>
@@ -912,16 +1293,42 @@ function DineIn() {
               </tr>
             </thead>
             <tbody>
-              {sessions.map((s) => (
-                <tr key={s.id}>
-                  <td><strong>{s.id}</strong></td>
-                  <td><span className="badge badge-primary">{s.table}</span></td>
-                  <td><strong>{s.guest}</strong></td>
+              {sessions.map((s, index) => (
+                <tr key={s.mongoId || s.id}>
+                  <td>{(sessionPage - 1) * SESSION_PAGE_SIZE + index + 1}</td>
+                  <td>
+                    {s.orderCode ? (
+                      <strong>{s.orderCode}</strong>
+                    ) : (
+                      <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                  <td>
+                    <span className="badge badge-primary">{s.table}</span>
+                    {s.section && (
+                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>
+                        {formatSection(s.section)}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <strong>{s.guest}</strong>
+                    {s.phone && (
+                      <div style={{ fontSize: 11, color: '#64748b' }}>{s.phone}</div>
+                    )}
+                  </td>
                   <td>{s.covers}</td>
-                  <td>{s.server}</td>
+                  <td>{s.server || 'Floor Staff'}{s.staffCode ? ` (${s.staffCode})` : ''}</td>
                   <td>{s.started}</td>
                   <td><span className={`badge ${sessionStatusBadge(s.status)}`}>{s.status}</span></td>
-                  <td><strong>{money(s.amount)}</strong></td>
+                  <td title="Total of all orders on this session — retrieved from dine-in orders">
+                    <strong>{money(s.amount)}</strong>
+                    {s.orderCount > 0 && (
+                      <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>
+                        {s.orderCount} order{s.orderCount > 1 ? 's' : ''}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button
@@ -931,8 +1338,6 @@ function DineIn() {
                         onClick={() => {
                           setSelectedTable(s.table);
                           setActionMode('order');
-                          setMenuCategory('All');
-                          setMenuSearch('');
                           window.scrollTo({ top: 300, behavior: 'smooth' });
                         }}
                       >
@@ -950,10 +1355,79 @@ function DineIn() {
                   </td>
                 </tr>
               ))}
+              {sessions.length === 0 && (
+                <tr>
+                  <td colSpan={10} style={{ textAlign: 'center', padding: '28px 12px', color: '#64748b' }}>
+                    {isSessionsLoading
+                      ? 'Loading active floor sessions…'
+                      : 'No active dine-in sessions right now.'}
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
+
+        {/* Active Floor Sessions Pagination */}
+        {sessionTotal > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              borderTop: '1px solid #e2e8f0',
+              padding: '14px 4px 0',
+              flexWrap: 'wrap',
+              gap: 10,
+              marginTop: 12,
+            }}
+          >
+            <div style={{ fontSize: 12.5, color: '#64748b' }}>
+              {isSessionsLoading
+                ? 'Loading active sessions…'
+                : `Showing ${sessionStartItem} to ${sessionEndItem} of ${sessionTotal} sessions`}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                type="button"
+                onClick={() => handleSessionPageChange(sessionPage - 1)}
+                disabled={sessionPage === 1 || isSessionsLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: sessionPage === 1 ? 'not-allowed' : 'pointer', opacity: sessionPage === 1 ? 0.5 : 1, fontSize: 12.5 }}
+              >
+                <ChevronLeft size={13} /> Prev
+              </button>
+              {getPageNumbers(sessionPage, sessionTotalPages).map((p, i) => (
+                <button
+                  key={`${p}-${i}`}
+                  type="button"
+                  onClick={() => typeof p === 'number' && handleSessionPageChange(p)}
+                  disabled={p === '...' || isSessionsLoading}
+                  style={{ padding: '5px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12.5, cursor: p === '...' ? 'default' : 'pointer', background: p === sessionPage ? 'var(--primary)' : '#fff', color: p === sessionPage ? '#fff' : 'inherit', fontWeight: p === sessionPage ? 700 : 400 }}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => handleSessionPageChange(sessionPage + 1)}
+                disabled={sessionPage === sessionTotalPages || isSessionsLoading}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 10px', border: '1px solid #e2e8f0', borderRadius: 6, background: '#fff', cursor: sessionPage === sessionTotalPages ? 'not-allowed' : 'pointer', opacity: sessionPage === sessionTotalPages ? 0.5 : 1, fontSize: 12.5 }}
+              >
+                Next <ChevronRight size={13} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Completed (paid) dine-in orders for the sessions on this page */}
+      <SessionOrdersCard
+        sessions={sessions}
+        settledSessionIds={settledSessionIds}
+        settledInvoices={settledInvoices}
+        onSessionSummary={handleSessionSummary}
+        money={money}
+      />
 
       {/* ══════════════════════════════════════════════
           MODALS (SEPARATED COMPONENTS)
@@ -961,10 +1435,10 @@ function DineIn() {
       <SeatGuestsModal
         isOpen={isSeatModalOpen}
         onClose={() => setIsSeatModalOpen(false)}
-        onConfirmSeat={handleConfirmSeat}
+        onSeated={handleSeated}
         availableTables={availableTables}
         preselectedTable={preselectedSeatTable}
-        defaultCovers={settings.defaultCovers}
+        servers={serversList}
       />
 
       <CheckoutPaymentModal
@@ -973,7 +1447,6 @@ function DineIn() {
         session={activeCheckoutSession}
         onCompleteCheckout={handleCompleteCheckout}
         settings={settings}
-        availableCoupons={AVAILABLE_COUPONS}
         money={money}
         onShowToast={showToast}
       />
@@ -990,7 +1463,7 @@ function DineIn() {
 
       {/* Toast Feedback */}
       {toastMessage && (
-        <div className="svc-toast success">
+        <div className={`svc-toast ${toastType}`}>
           <CheckCircle2 size={18} /> {toastMessage}
         </div>
       )}

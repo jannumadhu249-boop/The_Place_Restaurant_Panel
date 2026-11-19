@@ -1,0 +1,698 @@
+/* ══════════════════════════════════════════════
+   DINE-IN MODULE STYLES
+   Shared primitives (form controls, modals, toast,
+   menu/qty, tender tabs, toggle switch) stay in
+   ../ServiceOps.css — this file only holds styles
+   that are exclusive to the DineIn folder.
+══════════════════════════════════════════════ */
+
+/* ── Main two-column layout (floor plan + action panel) ─────────── */
+.svc-section-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 22px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 1024px) {
+  .svc-section-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Floor plan legend ──────────────────────────────────────────── */
+.svc-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.svc-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 650;
+}
+
+.svc-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+  background: #94a3b8;
+}
+
+.svc-legend-dot.available {
+  background: #10b981;
+}
+
+.svc-legend-dot.occupied {
+  background: #f97316;
+}
+
+.svc-legend-dot.reserved {
+  background: #3b82f6;
+}
+
+.svc-legend-dot.cleaning {
+  background: #94a3b8;
+}
+
+/* ── Floor table card content (card shell lives in ServiceOps.css) ─ */
+.svc-table-no {
+  font-size: 18px;
+  font-weight: 850;
+  color: var(--text-main);
+  letter-spacing: -0.3px;
+}
+
+.svc-table-sec {
+  font-size: 11px;
+  font-weight: 650;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.svc-table-seats {
+  font-size: 11.5px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.svc-table-guest {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-top: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.svc-table-time {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* ── Reserve table panel ────────────────────────────────────────── */
+.svc-reserve-subtitle {
+  font-size: 12.5px;
+  color: #64748b;
+}
+
+.svc-reserve-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.svc-reserve-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 480px) {
+  .svc-reserve-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.svc-reserve-submit {
+  width: 100%;
+  justify-content: center;
+}
+
+.svc-reserve-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.svc-reserve-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+/* Existing reservation — info box + cancel flow */
+.svc-reserve-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #eff6ff;
+  border: 1.5px solid #bfdbfe;
+  border-radius: 12px;
+  margin-bottom: 14px;
+}
+
+.svc-reserve-info-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.svc-reserve-info-row span {
+  color: #64748b;
+}
+
+.svc-reserve-info-row strong {
+  color: #0f172a;
+  text-align: right;
+}
+
+.svc-reserve-danger {
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.svc-reserve-danger:hover {
+  background: #fef2f2;
+}
+
+.svc-btn-danger {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #ffffff;
+  justify-content: center;
+}
+
+.svc-btn-danger:hover {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.svc-confirm-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1.5px solid #fecaca;
+  border-radius: 12px;
+}
+
+.svc-confirm-text {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
+.svc-confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.svc-confirm-actions .btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.svc-field-error {
+  display: block;
+  margin-top: 5px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.svc-input-invalid {
+  border-color: #fca5a5 !important;
+  background: #fff5f5;
+}
+
+.svc-spin {
+  animation: svc-spin 0.8s linear infinite;
+}
+
+@keyframes svc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Modern time-slot picker ────────────────────────────────────── */
+.svc-slot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.svc-slot-head .form-label {
+  margin-bottom: 0;
+}
+
+.svc-slot-hint {
+  font-size: 11.5px;
+  font-weight: 750;
+  color: var(--primary);
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  padding: 3px 9px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* Period tabs (Lunch / Afternoon / Dinner) */
+.svc-period-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 5px;
+  background: #f1f5f9;
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+
+.svc-period-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.svc-period-label {
+  font-size: 14px;
+  font-weight: 750;
+  color: #64748b;
+  line-height: 1.2;
+}
+
+.svc-period-range {
+  font-size: 11px;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
+  line-height: 1.2;
+}
+
+.svc-period-tab:hover:not(.active) {
+  background: #e9eef5;
+}
+
+.svc-period-tab.active {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.svc-period-tab.active .svc-period-label {
+  color: #0f172a;
+}
+
+.svc-period-tab.active .svc-period-range {
+  color: #64748b;
+}
+
+.svc-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.svc-slot {
+  min-height: 48px;
+  padding: 12px 8px;
+  border-radius: 12px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
+  font-family: inherit;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.svc-slot:hover:not(:disabled):not(.active) {
+  border-color: var(--primary-border);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+.svc-slot.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #ffffff;
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+
+.svc-slot:disabled {
+  background: #f8fafc;
+  border-color: #eef2f7;
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+@media (max-width: 420px) {
+  .svc-period-tab {
+    padding: 8px 4px;
+  }
+
+  .svc-period-range {
+    display: none;
+  }
+}
+
+.svc-duration-group {
+  display: flex;
+  gap: 8px;
+}
+
+.svc-duration {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 10px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.svc-duration:hover:not(.active) {
+  border-color: var(--primary-border);
+  color: var(--primary);
+}
+
+.svc-duration.active {
+  border-color: var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+/* ── Menu order cart summary ────────────────────────────────────── */
+.svc-cart-summary {
+  background: #f8fafc;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 14px;
+  margin-top: 4px;
+}
+
+.svc-cart-title {
+  font-size: 13.5px;
+  font-weight: 750;
+  color: var(--text-main);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.svc-cart-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 6px 0;
+  border-bottom: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.svc-cart-total {
+  display: flex;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 800;
+  padding-top: 10px;
+  color: var(--text-main);
+}
+
+/* ── Checkout bill rows ─────────────────────────────────────────── */
+.svc-bill-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13.5px;
+  padding: 8px 0;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.svc-bill-row strong {
+  color: #ffffff;
+}
+
+.svc-bill-row.total {
+  border-top: 1px dashed rgba(255, 255, 255, 0.2);
+  margin-top: 10px;
+  padding-top: 14px;
+  font-size: 15px;
+  font-weight: 750;
+  color: #ffffff;
+}
+
+.svc-bill-row.total strong {
+  color: #fb923c;
+  font-size: 22px;
+}
+
+/* ── Coupon & discount (checkout) ───────────────────────────────── */
+.svc-coupon-input-wrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.svc-coupon-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.svc-coupon-chip {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px dashed var(--primary);
+  background: var(--primary-light);
+  color: var(--primary);
+  font-size: 11.5px;
+  font-weight: 750;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.svc-coupon-chip:hover {
+  background: #ffedd5;
+  transform: translateY(-1px);
+}
+
+.svc-coupon-chip.applied {
+  background: var(--primary);
+  color: #ffffff;
+  border-style: solid;
+}
+
+/* ── Order food panel (categories + available menu) ─────────────── */
+.svc-order-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.svc-order-state {
+  display: block;
+  padding: 22px 14px;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px dashed #e2e8f0;
+  border-radius: 12px;
+}
+
+.svc-order-state.error {
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.svc-cart-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.svc-cart-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.svc-cart-line strong {
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.svc-cart-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 0 0 10px;
+}
+
+/* ── Completed orders table (settled orders + invoice) ───────────── */
+/* ── Itemized bill inside the checkout modal ────────────────────── */
+.svc-bill-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.svc-bill-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+
+.svc-bill-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #334155;
+  font-weight: 600;
+}
+
+.svc-bill-item-qty {
+  color: #64748b;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.svc-bill-item-amt {
+  color: #0f172a;
+  white-space: nowrap;
+}
+
+.svc-session-order-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 3px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.svc-session-order-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.svc-session-order-items span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.svc-invoice-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: none;
+  background: var(--primary-light);
+  border: 1px solid var(--primary-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+button.svc-invoice-link {
+  cursor: pointer;
+}
+
+button.svc-invoice-link:hover {
+  background: #ffedd5;
+}
+
+a.svc-invoice-link:hover {
+  background: #ffedd5;
+}
+
+.svc-order-status {
+  font-size: 11px;
+  font-weight: 750;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
+  text-transform: capitalize;
+}
+
+.svc-order-status.delivered,
+.svc-order-status.paid {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #059669;
+}
+
+.svc-order-status.pending {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #a16207;
+}
+
+.svc-order-status.cancelled {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #b91c1c;
+}

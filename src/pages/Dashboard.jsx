@@ -1,20 +1,15 @@
 import React, { useState } from 'react';
 import {
   ShoppingBag,
-  DollarSign,
   Utensils,
   Star,
   TrendingUp,
-  Clock,
   ArrowUpRight,
   ChefHat,
   Bike,
   CheckCircle2,
-  AlertCircle,
   Plus,
-  ArrowRight,
   Sparkles,
-  Search,
   IndianRupee
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -66,9 +61,14 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Modern High-Impact Metrics Grid */}
+      {/* Modern High-Impact Metrics Grid — each card links to its module */}
       <div className="stats-grid">
-        <div className="stat-card" style={{ borderLeft: '4px solid var(--primary)' }}>
+        <Link
+          to="/reports/transaction"
+          className="stat-card"
+          title="Open the transaction report"
+          style={{ borderLeft: '4px solid var(--primary)' }}
+        >
           <div className="stat-icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)' }}>
             <IndianRupee size={24} />
           </div>
@@ -79,9 +79,15 @@ export default function Dashboard() {
               <TrendingUp size={13} /> +18.4% vs yesterday
             </div>
           </div>
-        </div>
+          <ArrowUpRight size={16} className="stat-open-icon" />
+        </Link>
 
-        <div className="stat-card" style={{ borderLeft: '4px solid #10b981' }}>
+        <Link
+          to="/orders"
+          className="stat-card"
+          title="Open the order dispatch queue"
+          style={{ borderLeft: '4px solid #10b981' }}
+        >
           <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
             <ShoppingBag size={24} />
           </div>
@@ -92,9 +98,15 @@ export default function Dashboard() {
               4 active in kitchen now
             </div>
           </div>
-        </div>
+          <ArrowUpRight size={16} className="stat-open-icon" />
+        </Link>
 
-        <div className="stat-card" style={{ borderLeft: '4px solid #f59e0b' }}>
+        <Link
+          to="/reviews"
+          className="stat-card"
+          title="Open customer reviews"
+          style={{ borderLeft: '4px solid #f59e0b' }}
+        >
           <div className="stat-icon" style={{ background: '#fffbeb', color: '#f59e0b' }}>
             <Star size={24} fill="#f59e0b" />
           </div>
@@ -105,9 +117,15 @@ export default function Dashboard() {
               Based on 215 verified reviews
             </div>
           </div>
-        </div>
+          <ArrowUpRight size={16} className="stat-open-icon" />
+        </Link>
 
-        <div className="stat-card" style={{ borderLeft: '4px solid #6366f1' }}>
+        <Link
+          to="/food-management/foods"
+          className="stat-card"
+          title="Open the food menu"
+          style={{ borderLeft: '4px solid #6366f1' }}
+        >
           <div className="stat-icon" style={{ background: '#eef2ff', color: '#6366f1' }}>
             <Utensils size={24} />
           </div>
@@ -118,7 +136,8 @@ export default function Dashboard() {
               ● 100% kitchen availability
             </div>
           </div>
-        </div>
+          <ArrowUpRight size={16} className="stat-open-icon" />
+        </Link>
 
         {/* <div className="stat-card" style={{ borderLeft: '4px solid #e11d48' }}>
           <div className="stat-icon" style={{ background: '#fff1f2', color: '#e11d48' }}>

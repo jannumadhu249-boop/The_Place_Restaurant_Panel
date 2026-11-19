@@ -522,6 +522,32 @@ body {
   box-shadow: 0 8px 24px -2px rgba(15, 23, 42, 0.08);
 }
 
+/* Metric cards that navigate — the card itself is the link */
+a.stat-card {
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+a.stat-card:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.stat-open-icon {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  opacity: 0.45;
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.2s ease;
+}
+
+a.stat-card:hover .stat-open-icon {
+  opacity: 1;
+  color: var(--primary);
+  transform: translate(2px, -2px);
+}
+
 .stat-icon {
   width: 48px;
   height: 48px;
