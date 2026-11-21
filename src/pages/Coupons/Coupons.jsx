@@ -294,6 +294,7 @@ export default function Coupons() {
           <table className="data-table">
             <thead>
               <tr>
+                <th>SL.No</th>
                 <th>Coupon Code</th>
                 <th>Coupon Name</th>
                 <th>Discount</th>
@@ -324,8 +325,9 @@ export default function Coupons() {
                 </tr>
               )}
 
-              {coupons.map((c) => (
+              {coupons.map((c, index) => (
                 <tr key={c.id}>
+                  <td>{index + 1}</td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                       <div>

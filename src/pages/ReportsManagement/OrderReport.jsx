@@ -4,9 +4,14 @@ import {
   Download,
   Search,
   Filter,
-  RefreshCw
+  RefreshCw,
+  CheckCircle2,
+  XCircle,
+  IndianRupee
 } from 'lucide-react';
 import './Reports.css';
+import ReportStatsCards from './ReportStatsCards';
+import ReportPagination from './ReportPagination';
 
 const SAMPLE_ORDERS = [
   { id: 'ORD-8924', customer: 'Sophie Taylor', items: 6, type: 'Delivery', status: 'Completed', amount: 48.5, date: '2026-10-30' },
@@ -24,6 +29,8 @@ export default function OrderReport() {
   const [status, setStatus] = useState('All');
   const [type, setType] = useState('All');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const filtered = useMemo(() => {
     return SAMPLE_ORDERS.filter((o) => {
@@ -50,6 +57,11 @@ export default function OrderReport() {
     };
   }, [filtered]);
 
+  // Client-side pagination — clamps to the real page count when filters shrink the list
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const statusBadge = (s) => {
     if (s === 'Completed') return 'badge-success';
     if (s === 'Cancelled' || s === 'Refunded') return 'badge-danger';
@@ -75,28 +87,14 @@ export default function OrderReport() {
         </div>
       </div>
 
-      <div className="report-summary">
-        <div className="report-summary-card">
-          <div className="report-summary-label">Total Orders</div>
-          <div className="report-summary-value">{totals.count}</div>
-          <div className="report-summary-hint">In selected range</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Completed</div>
-          <div className="report-summary-value" style={{ color: 'var(--success)' }}>{totals.completed}</div>
-          <div className="report-summary-hint">Successfully fulfilled</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Cancelled / Refunded</div>
-          <div className="report-summary-value" style={{ color: 'var(--danger)' }}>{totals.cancelled}</div>
-          <div className="report-summary-hint">Lost or reversed</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Gross Revenue</div>
-          <div className="report-summary-value">₹ {totals.revenue.toFixed(2)}</div>
-          <div className="report-summary-hint">From completed orders</div>
-        </div>
-      </div>
+      <ReportStatsCards
+        cards={[
+          { label: 'Total Orders', value: totals.count, hint: 'In selected range', icon: <FileBarChart size={18} />, tone: 'blue' },
+          { label: 'Completed', value: totals.completed, hint: 'Successfully fulfilled', icon: <CheckCircle2 size={18} />, tone: 'green' },
+          { label: 'Cancelled / Refunded', value: totals.cancelled, hint: 'Lost or reversed', icon: <XCircle size={18} />, tone: 'red' },
+          { label: 'Gross Revenue', value: `₹ ${totals.revenue.toFixed(2)}`, hint: 'From completed orders', icon: <IndianRupee size={18} />, tone: 'amber' },
+        ]}
+      />
 
       <div className="card">
         <div className="card-header">
@@ -109,15 +107,15 @@ export default function OrderReport() {
         <div className="report-filters">
           <div className="form-group">
             <label className="form-label">From Date</label>
-            <input type="date" className="form-input" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            <input type="date" className="form-input" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
             <label className="form-label">To Date</label>
-            <input type="date" className="form-input" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            <input type="date" className="form-input" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
             <label className="form-label">Status</label>
-            <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select className="form-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
               <option>All</option>
               <option>Completed</option>
               <option>Cancelled</option>
@@ -126,7 +124,7 @@ export default function OrderReport() {
           </div>
           <div className="form-group">
             <label className="form-label">Order Type</label>
-            <select className="form-select" value={type} onChange={(e) => setType(e.target.value)}>
+            <select className="form-select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
               <option>All</option>
               <option>Delivery</option>
               <option>Takeaway</option>
@@ -142,7 +140,7 @@ export default function OrderReport() {
                 style={{ paddingLeft: 36 }}
                 placeholder="Order ID or customer…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
           </div>
@@ -170,7 +168,7 @@ export default function OrderReport() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((o) => (
+                pagedRows.map((o) => (
                   <tr key={o.id}>
                     <td><strong>{o.id}</strong></td>
                     <td>{o.customer}</td>
@@ -185,6 +183,17 @@ export default function OrderReport() {
             </tbody>
           </table>
         </div>
+
+        <ReportPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );

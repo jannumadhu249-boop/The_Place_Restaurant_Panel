@@ -255,6 +255,7 @@ export default function Reviews() {
             <table className="data-table">
               <thead>
                 <tr>
+                  <th>SL.NO</th>
                   <th>Customer</th>
                   <th>Order ID</th>
                   <th>Star Rating</th>
@@ -265,8 +266,9 @@ export default function Reviews() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(r => (
+                {filtered.map((r, index) => (
                   <tr key={r.id}>
+                    <td>{index + 1}</td>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{

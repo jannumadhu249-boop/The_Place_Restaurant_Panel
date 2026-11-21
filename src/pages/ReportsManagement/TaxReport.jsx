@@ -1,6 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { Receipt, Download, RefreshCw, Filter } from 'lucide-react';
+import {
+  Receipt,
+  Download,
+  RefreshCw,
+  Filter,
+  IndianRupee,
+  CheckCircle2,
+  Clock3
+} from 'lucide-react';
 import './Reports.css';
+import ReportStatsCards from './ReportStatsCards';
+import ReportPagination from './ReportPagination';
 
 const SAMPLE_TAX = [
   { period: '2026-10-27', orders: 42, taxableSales: 1280.4, taxRate: 8.5, taxCollected: 108.83, taxRemitted: 108.83 },
@@ -14,6 +24,8 @@ export default function TaxReport() {
   const [fromDate, setFromDate] = useState('2026-10-01');
   const [toDate, setToDate] = useState('2026-10-31');
   const [remittance, setRemittance] = useState('All');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const filtered = useMemo(() => {
     return SAMPLE_TAX.filter((row) => {
@@ -39,6 +51,11 @@ export default function TaxReport() {
     );
   }, [filtered]);
 
+  // Client-side pagination — clamps to the real page count when filters shrink the list
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div style={{ width: '100%' }}>
       <div className="page-header">
@@ -58,30 +75,14 @@ export default function TaxReport() {
         </div>
       </div>
 
-      <div className="report-summary">
-        <div className="report-summary-card">
-          <div className="report-summary-label">Taxable Sales</div>
-          <div className="report-summary-value">₹ {totals.sales.toFixed(2)}</div>
-          <div className="report-summary-hint">{totals.orders} orders</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Tax Collected</div>
-          <div className="report-summary-value">₹ {totals.collected.toFixed(2)}</div>
-          <div className="report-summary-hint">From customers</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Tax Remitted</div>
-          <div className="report-summary-value" style={{ color: 'var(--success)' }}>₹ {totals.remitted.toFixed(2)}</div>
-          <div className="report-summary-hint">Already filed</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Pending Remittance</div>
-          <div className="report-summary-value" style={{ color: 'var(--warning)' }}>
-            ₹ {(totals.collected - totals.remitted).toFixed(2)}
-          </div>
-          <div className="report-summary-hint">Still due</div>
-        </div>
-      </div>
+      <ReportStatsCards
+        cards={[
+          { label: 'Taxable Sales', value: `₹ ${totals.sales.toFixed(2)}`, hint: `${totals.orders} orders`, icon: <IndianRupee size={18} />, tone: 'blue' },
+          { label: 'Tax Collected', value: `₹ ${totals.collected.toFixed(2)}`, hint: 'From customers', icon: <Receipt size={18} />, tone: 'green' },
+          { label: 'Tax Remitted', value: `₹ ${totals.remitted.toFixed(2)}`, hint: 'Already filed', icon: <CheckCircle2 size={18} />, tone: 'violet' },
+          { label: 'Pending Remittance', value: `₹ ${(totals.collected - totals.remitted).toFixed(2)}`, hint: 'Still due', icon: <Clock3 size={18} />, tone: 'amber' },
+        ]}
+      />
 
       <div className="card">
         <div className="card-header">
@@ -94,15 +95,15 @@ export default function TaxReport() {
         <div className="report-filters">
           <div className="form-group">
             <label className="form-label">From Date</label>
-            <input type="date" className="form-input" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            <input type="date" className="form-input" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
             <label className="form-label">To Date</label>
-            <input type="date" className="form-input" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            <input type="date" className="form-input" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
             <label className="form-label">Remittance</label>
-            <select className="form-select" value={remittance} onChange={(e) => setRemittance(e.target.value)}>
+            <select className="form-select" value={remittance} onChange={(e) => { setRemittance(e.target.value); setPage(1); }}>
               <option>All</option>
               <option>Remitted</option>
               <option>Pending</option>
@@ -132,7 +133,7 @@ export default function TaxReport() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((r) => {
+                pagedRows.map((r) => {
                   const done = r.taxRemitted >= r.taxCollected;
                   return (
                     <tr key={r.period}>
@@ -154,6 +155,17 @@ export default function TaxReport() {
             </tbody>
           </table>
         </div>
+
+        <ReportPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );

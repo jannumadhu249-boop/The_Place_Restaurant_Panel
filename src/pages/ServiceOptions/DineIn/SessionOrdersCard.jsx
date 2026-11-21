@@ -1,5 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertCircle, CheckCircle2, FileText, Loader2, RefreshCw } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Loader2,
+  RefreshCw,
+} from 'lucide-react';
 import { URLS } from '../../../url';
 
 const getAuthHeaders = () => {
@@ -12,6 +20,24 @@ const getAuthHeaders = () => {
 };
 
 const defaultMoney = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+
+const getPageNumbers = (currentPage, total) => {
+  if (total <= 5) return Array.from({ length: total }, (_, i) => i + 1);
+  if (currentPage <= 3) return [1, 2, 3, 4, '...', total];
+  if (currentPage >= total - 2) return [1, '...', total - 3, total - 2, total - 1, total];
+  return [1, '...', currentPage - 1, currentPage, currentPage + 1, '...', total];
+};
+
+const pagerBtn = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 4,
+  padding: '5px 10px',
+  border: '1px solid #e2e8f0',
+  borderRadius: 6,
+  background: '#fff',
+  fontSize: 12.5,
+};
 
 // ISO string → "2026-11-19 · 10:41" without constructing a Date during render
 const formatOrderTime = (value) => {
@@ -96,6 +122,7 @@ export default function SessionOrdersCard({
   settledSessionIds = [],
   settledInvoices = NO_INVOICES,
   onSessionSummary,
+  onRefresh,
   money = defaultMoney,
 }) {
   // Accumulated so a just-settled session keeps its order visible after it leaves the floor list
@@ -105,8 +132,24 @@ export default function SessionOrdersCard({
   const [openTotal, setOpenTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  // const [syncingSessionId, setSyncingSessionId] = useState(null);
+  // const [syncFeedback, setSyncFeedback] = useState(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
   // Guards against a slow response overwriting a newer one
   const runIdRef = useRef(0);
+
+  const totalCompleted = completedOrders.length;
+  const totalPages = Math.max(1, Math.ceil(totalCompleted / pageSize));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  const startIdx = (safePage - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, totalCompleted);
+  const displayedOrders = completedOrders.slice(startIdx, endIdx);
+
+  const handlePageChange = (newPage) => {
+    if (newPage < 1 || newPage > totalPages || newPage === safePage) return;
+    setPage(newPage);
+  };
 
   const tableBySession = useMemo(() => {
     const map = new Map();
@@ -129,7 +172,7 @@ export default function SessionOrdersCard({
 
   const settledKey = (settledSessionIds || []).map(String).join(',');
 
-  // ── API: DINE-IN ORDERS (SINGLE GET /v1/place/restaurant/dine-in/orders) ──
+  // ── API: DINE-IN ORDERS ──
   const fetchOrders = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -137,11 +180,8 @@ export default function SessionOrdersCard({
     const runId = runIdRef.current;
     try {
       const settledSet = new Set(settledKey ? settledKey.split(',') : []);
-
-      // Fetch all dine-in orders in one request
       const allOrders = await requestAllOrders();
 
-      // A newer run already answered — drop this result
       if (runId !== runIdRef.current) return;
 
       // Attach instant checkout invoice to recent orders if present
@@ -178,7 +218,6 @@ export default function SessionOrdersCard({
         onSessionSummary(summary);
       }
 
-      // Orders with invoice or marked paid / completed
       const finished = allOrders.filter(
         (o) =>
           Boolean(o.invoice) ||
@@ -209,6 +248,51 @@ export default function SessionOrdersCard({
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
+
+  // Sync payment status with POST /v1/place/restaurant/dine-in/payments/sync-status
+  // const syncPaymentStatus = async (sessionId) => {
+  //   if (!sessionId || syncingSessionId) return;
+  //   setSyncingSessionId(sessionId);
+  //   setSyncFeedback(null);
+  //   try {
+  //     const res = await fetch(URLS.PaymentStatus, {
+  //       method: 'POST',
+  //       headers: getAuthHeaders(),
+  //       body: JSON.stringify({ sessionId }),
+  //     });
+  //     const data = await res.json().catch(() => ({}));
+  //     if (res.ok && data.status !== false && data.success !== false) {
+  //       setSyncFeedback({
+  //         sessionId,
+  //         text: data.message || 'Payment status synced!',
+  //         type: 'success',
+  //       });
+  //       await fetchOrders();
+  //       if (onRefresh) onRefresh();
+  //     } else {
+  //       setSyncFeedback({
+  //         sessionId,
+  //         text: data.message || 'Payment status sync failed.',
+  //         type: 'error',
+  //       });
+  //     }
+  //   } catch (err) {
+  //     console.warn('Payment status sync failed:', err);
+  //     setSyncFeedback({
+  //       sessionId,
+  //       text: 'Network error while syncing status.',
+  //       type: 'error',
+  //     });
+  //   } finally {
+  //     setSyncingSessionId(null);
+  //     setTimeout(() => setSyncFeedback(null), 4000);
+  //   }
+  // };
+
+  const handleTopRefresh = async () => {
+    await fetchOrders();
+    if (onRefresh) onRefresh();
+  };
 
   // Invoice PDF is access-protected — fetch it with the token before opening
   const openInvoice = async (url) => {
@@ -248,11 +332,13 @@ export default function SessionOrdersCard({
         <button
           type="button"
           className="btn btn-outline"
-          style={{ padding: '6px 12px', fontSize: 12 }}
-          onClick={fetchOrders}
-          disabled={isLoading}
+          style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          onClick={handleTopRefresh}
+          // disabled={isLoading || Boolean(syncingSessionId)}
+          title="Refresh completed dine-in orders"
         >
-          <RefreshCw size={13} /> Refresh
+          <RefreshCw size={13} className={isLoading ? 'svc-spin' : ''} />
+          {isLoading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 
@@ -279,12 +365,15 @@ export default function SessionOrdersCard({
             </tr>
           </thead>
           <tbody>
-            {completedOrders.map((order,index) => {
+            {displayedOrders.map((order, index) => {
               const table =
                 order.table || tableBySession.get(String(order.sessionMongoId)) || '—';
+              // const isSyncing = syncingSessionId === order.sessionMongoId;
+              // const hasFeedback = syncFeedback && syncFeedback.sessionId === order.sessionMongoId;
+
               return (
                 <tr key={order.id}>
-                  <td>{index+1}</td>
+                  <td>{startIdx + index + 1}</td>
                   <td>
                     <span className="badge badge-primary">{table}</span>
                   </td>
@@ -307,14 +396,38 @@ export default function SessionOrdersCard({
                     )}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
                       <span className={`svc-order-status ${order.paymentStatus || 'paid'}`}>
                         {order.paymentStatus || 'paid'}
                       </span>
                       {order.paymentMethod && (
                         <span className="svc-order-status">{order.paymentMethod.toUpperCase()}</span>
                       )}
+                      {/* {order.sessionMongoId && (
+                        <button
+                          type="button"
+                          className="svc-sync-btn"
+                          onClick={() => syncPaymentStatus(order.sessionMongoId)}
+                          disabled={isSyncing}
+                          title="Sync live payment status from server"
+                        >
+                          <RefreshCw size={10} className={isSyncing ? 'svc-spin' : ''} />
+                          {isSyncing ? 'Syncing…' : 'Sync'}
+                        </button>
+                      )} */}
                     </div>
+                    {/* {hasFeedback && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          marginTop: 4,
+                          fontWeight: 600,
+                          color: syncFeedback.type === 'error' ? '#ef4444' : '#10b981',
+                        }}
+                      >
+                        {syncFeedback.text}
+                      </div>
+                    )} */}
                   </td>
                   <td>
                     <strong>{money(order.total)}</strong>
@@ -351,7 +464,7 @@ export default function SessionOrdersCard({
             {completedOrders.length === 0 && (
               <tr>
                 <td
-                  colSpan={8}
+                  colSpan={9}
                   style={{ textAlign: 'center', padding: '22px 12px', color: '#64748b' }}
                 >
                   {isLoading ? (
@@ -374,6 +487,70 @@ export default function SessionOrdersCard({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination */}
+      {totalCompleted > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            borderTop: '1px solid #e2e8f0',
+            padding: '14px 4px',
+            flexWrap: 'wrap',
+            gap: 10,
+            marginTop: 8,
+          }}
+        >
+          <div style={{ fontSize: 12.5, color: '#64748b' }}>
+            Showing {totalCompleted === 0 ? 0 : startIdx + 1} to {endIdx} of {totalCompleted} completed orders
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <button
+              type="button"
+              onClick={() => handlePageChange(safePage - 1)}
+              disabled={safePage === 1}
+              style={{
+                ...pagerBtn,
+                cursor: safePage === 1 ? 'not-allowed' : 'pointer',
+                opacity: safePage === 1 ? 0.5 : 1,
+              }}
+            >
+              <ChevronLeft size={13} /> Prev
+            </button>
+            {getPageNumbers(safePage, totalPages).map((p, i) => (
+              <button
+                key={`${p}-${i}`}
+                type="button"
+                onClick={() => typeof p === 'number' && handlePageChange(p)}
+                disabled={p === '...'}
+                style={{
+                  ...pagerBtn,
+                  display: 'inline-block',
+                  cursor: p === '...' ? 'default' : 'pointer',
+                  background: p === safePage ? 'var(--primary)' : '#fff',
+                  color: p === safePage ? '#fff' : 'inherit',
+                  fontWeight: p === safePage ? 700 : 400,
+                }}
+              >
+                {p}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => handlePageChange(safePage + 1)}
+              disabled={safePage === totalPages}
+              style={{
+                ...pagerBtn,
+                cursor: safePage === totalPages ? 'not-allowed' : 'pointer',
+                opacity: safePage === totalPages ? 0.5 : 1,
+              }}
+            >
+              Next <ChevronRight size={13} />
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

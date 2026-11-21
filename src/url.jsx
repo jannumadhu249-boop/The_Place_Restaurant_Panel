@@ -103,6 +103,7 @@ export const URLS = {
     CheckoutDineIn: base_url + "v1/place/restaurant/dine-in/sessions/checkout",
     GetDineInOrders: base_url + "v1/place/restaurant/dine-in/orders",
     CreateDineInOrder: base_url + "v1/place/restaurant/dine-in/orders/add",
+    PaymentStatus: base_url + "v1/place/restaurant/dine-in/payments/sync-status",
 
 
 

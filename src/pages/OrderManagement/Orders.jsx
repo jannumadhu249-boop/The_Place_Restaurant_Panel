@@ -364,7 +364,7 @@ export default function Orders() {
             style={{ display: 'flex', alignItems: 'center', gap: 6 }}
             title="Refresh bookings"
           >
-            <RefreshCw size={15} className={loading ? 'fp-spinner' : ''} />
+            <RefreshCw size={15} className={loading ? 'spin' : ''} />
             <span>Refresh</span>
           </button>
           <button className="btn btn-outline" onClick={() => window.print()}>
@@ -391,10 +391,9 @@ export default function Orders() {
         </div>
       )}
 
-      {/* Top Search Bar & Status Filter in Same Line */}
-      <div className="card orders-filter-bar">
-        <div className="orders-filter-row">
-          {/* Search bar on the left */}
+      {/* Unified Orders Panel: filters, table and pagination in a single card */}
+      <div className="card orders-panel">
+        <div className="orders-panel-head">
           <div className="orders-search-box">
             <Search size={16} className="orders-search-icon" />
             <input
@@ -404,9 +403,18 @@ export default function Orders() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                className="orders-search-clear"
+                onClick={() => setSearch('')}
+                title="Clear search"
+              >
+                <X size={12} />
+              </button>
+            )}
           </div>
 
-          {/* Status Tabs on the right in the same line */}
           <div className="orders-tabs-group">
             {statusTabs.map(s => {
               const count = s === 'All'
@@ -415,55 +423,53 @@ export default function Orders() {
                     const st = getOrderStatus(x);
                     return s === 'Cancelled' ? (st === 'cancelled' || st === 'rejected') : st === s.toLowerCase();
                   }).length;
-              const active = filter === s;
               return (
                 <button
                   key={s}
+                  type="button"
                   onClick={() => setFilter(s)}
-                  className={`btn btn-sm orders-tab-btn ${active ? 'btn-primary' : 'btn-outline'}`}
+                  className={`orders-tab-btn ${filter === s ? 'is-active' : ''}`}
                 >
-                  {s} ({count})
+                  <span>{s}</span>
+                  <span className="orders-tab-count">{count}</span>
                 </button>
               );
             })}
           </div>
         </div>
-      </div>
-
-      {/* Orders Data Table */}
-      <div className="card">
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-            <RefreshCw size={28} className="fp-spinner" style={{ margin: '0 auto 12px' }} />
+          <div className="orders-state">
+            <div className="orders-spinner" />
             <p style={{ margin: 0 }}>Loading bookings and orders...</p>
           </div>
         ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '50px 20px', color: 'var(--text-muted)' }}>
-            <ShoppingCart size={36} style={{ margin: '0 auto 10px', opacity: 0.5 }} />
-            <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 6px' }}>No Orders Found</h3>
-            <p style={{ fontSize: 13, margin: 0 }}>
+          <div className="orders-state">
+            <ShoppingCart size={36} style={{ margin: '0 auto 10px', opacity: 0.4 }} />
+            <h3 className="orders-state-title">No Orders Found</h3>
+            <p className="orders-state-desc">
               {search || filter !== 'All'
                 ? 'No orders match the selected filters.'
                 : 'There are no active bookings for your restaurant at the moment.'}
             </p>
           </div>
         ) : (
-          <div className="table-container">
-            <table className="data-table">
+          <div className="orders-table-wrap">
+            <table className="data-table orders-table">
               <thead>
                 <tr>
                   <th>SL.No</th>
                   <th>Order Ticket</th>
                   <th>Customer & Location</th>
+                  {/* <th>Address</th> */}
                   <th>Ordered Items</th>
                   <th>Dietary Type</th>
                   <th>Payment</th>
                   <th>Status</th>
-                  <th>Actions</th>
+                  <th className="orders-col-actions">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(o => {
+                {filtered.map((o, index) => {
                   const orderId = getOrderId(o);
                   const custName = getCustomerName(o);
                   const custPhone = getCustomerPhone(o);
@@ -480,7 +486,7 @@ export default function Orders() {
 
                   return (
                     <tr key={mongoId || orderId}>
-                      <td>{filtered.indexOf(o) + 1}</td>
+                      <td>{(page - 1) * limit + index + 1}</td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <strong style={{ fontSize: 13.5, color: 'var(--primary)' }}>
@@ -497,6 +503,10 @@ export default function Orders() {
                         <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{custAddr}</div>
                         <div style={{ fontSize: 11.5, color: 'var(--text-light)' }}>{custPhone}</div>
                       </td>
+
+                      {/* <td>
+                        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{custAddr}</div>
+                      </td> */}
 
                       <td style={{ maxWidth: 260 }}>
                         {products.length === 0 ? (
@@ -549,31 +559,33 @@ export default function Orders() {
                           status === 'ready' ? 'badge-info' :
                           status === 'delivered' ? 'badge-success' : 'badge-danger'
                         }`}>
-                          {status === 'pending' ? '⏳ Pending' :
-                           status === 'accepted' ? '🤝 Accepted' :
-                           status === 'preparing' ? '🔥 Preparing' :
-                           status === 'ready' ? '📦 Ready' :
-                           status === 'delivered' ? '✓ Delivered' :
-                           status === 'rejected' ? '✕ Rejected' :
-                           status === 'cancelled' ? '✕ Cancelled' : status}
+                          {status === 'pending' ? 'Pending' :
+                           status === 'accepted' ? 'Accepted' :
+                           status === 'preparing' ? 'Preparing' :
+                           status === 'ready' ? 'Ready' :
+                           status === 'delivered' ? 'Delivered' :
+                           status === 'rejected' ? 'Rejected' :
+                           status === 'cancelled' ? 'Cancelled' : status}
                         </span>
                       </td>
 
-                      {/* Actions Column with Equal Length Buttons */}
-                      <td>
-                        <div className="orders-action-cell">
+                      {/* Actions */}
+                      <td className="orders-col-actions">
+                        <div className="orders-actions-cell">
                           {status === 'pending' && (
                             <>
                               <button
-                                className="btn btn-sm orders-action-btn orders-btn-icon-only orders-btn-accept"
+                                type="button"
+                                className="orders-action-btn is-icon is-success"
                                 disabled={updatingId === mongoId}
                                 title="Accept Incoming Order"
                                 onClick={() => handleUpdateStatus(mongoId, 'accepted')}
                               >
-                                <Check size={13} />
+                                <Check size={14} />
                               </button>
                               <button
-                                className="btn btn-sm btn-danger orders-action-btn orders-btn-icon-only"
+                                type="button"
+                                className="orders-action-btn is-icon is-danger"
                                 disabled={updatingId === mongoId}
                                 title="Reject Incoming Order"
                                 onClick={() => {
@@ -582,53 +594,57 @@ export default function Orders() {
                                   }
                                 }}
                               >
-                                <X size={13} />
+                                <X size={14} />
                               </button>
                             </>
                           )}
 
                           {status === 'accepted' && (
                             <button
-                              className="btn btn-sm btn-primary orders-action-btn orders-btn-labeled"
+                              type="button"
+                              className="orders-action-btn is-label is-info"
                               disabled={updatingId === mongoId}
                               title="Start Cooking / Preparing in Kitchen"
                               onClick={() => handleUpdateStatus(mongoId, 'preparing')}
                             >
-                              <ChefHat size={12} />
+                              <ChefHat size={13} />
                               <span>Prepare</span>
                             </button>
                           )}
 
                           {status === 'preparing' && (
                             <button
-                              className="btn btn-sm btn-primary orders-action-btn orders-btn-labeled orders-btn-ready"
+                              type="button"
+                              className="orders-action-btn is-label is-warning"
                               disabled={updatingId === mongoId}
                               title="Mark Food Ready for Courier Pickup"
                               onClick={() => handleUpdateStatus(mongoId, 'ready')}
                             >
-                              <ChefHat size={12} />
+                              <ChefHat size={13} />
                               <span>Ready</span>
                             </button>
                           )}
 
                           {status === 'ready' && (
                             <button
-                              className="btn btn-sm btn-primary orders-action-btn orders-btn-labeled orders-btn-deliver"
+                              type="button"
+                              className="orders-action-btn is-label is-success"
                               disabled={updatingId === mongoId}
                               title="Hand Over Order / Mark Delivered"
                               onClick={() => handleUpdateStatus(mongoId, 'delivered')}
                             >
-                              <Bike size={12} />
+                              <Bike size={13} />
                               <span>Deliver</span>
                             </button>
                           )}
 
                           <button
-                            className="btn btn-outline btn-sm orders-action-btn orders-btn-icon-only"
+                            type="button"
+                            className="orders-action-btn is-icon is-neutral"
                             title="View Full Booking Ticket"
                             onClick={() => handleViewOrder(o)}
                           >
-                            <Eye size={13} />
+                            <Eye size={14} />
                           </button>
 
                           {invoiceLink && (
@@ -636,11 +652,10 @@ export default function Orders() {
                               href={invoiceLink}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="btn btn-outline btn-sm orders-action-btn orders-btn-icon-only"
-                              style={{ textDecoration: 'none' }}
+                              className="orders-action-btn is-icon is-neutral"
                               title="Download Tax Invoice PDF"
                             >
-                              <FileText size={12} />
+                              <FileText size={13} />
                             </a>
                           )}
                         </div>
@@ -653,33 +668,19 @@ export default function Orders() {
           </div>
         )}
 
-        {/* ══════════════════════════════════════════════
-            PAGINATION CONTROLS
-        ══════════════════════════════════════════════ */}
+        {/* Pagination */}
         {!loading && orders.length > 0 && (
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '16px 20px',
-            borderTop: '1px solid #e2e8f0',
-            flexWrap: 'wrap',
-            gap: 12,
-            fontSize: 13,
-            color: '#475569',
-          }}>
-            {/* Left: Range and Per-page select */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-              <span>
-                Showing <strong>{totalRecords === 0 ? 0 : (page - 1) * limit + 1}</strong> to <strong>{Math.min(page * limit, totalRecords)}</strong> of <strong>{totalRecords}</strong> orders
+          <div className="orders-panel-foot">
+            <div className="orders-pagination-left">
+              <span className="orders-pagination-info">
+                Showing <strong>{totalRecords === 0 ? 0 : (page - 1) * limit + 1}</strong>–<strong>{Math.min(page * limit, totalRecords)}</strong> of <strong>{totalRecords}</strong> orders
               </span>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span>Rows per page:</span>
+              <div className="orders-page-size">
+                <span>Rows</span>
                 <select
                   value={limit}
                   onChange={(e) => handleLimitChange(Number(e.target.value))}
-                  className="form-select"
-                  style={{ width: 'auto', padding: '4px 8px', height: 32, fontSize: 12.5 }}
+                  className="form-select orders-page-size-select"
                 >
                   <option value={5}>5</option>
                   <option value={10}>10</option>
@@ -689,40 +690,26 @@ export default function Orders() {
               </div>
             </div>
 
-            {/* Right: Previous, Page Numbers, Next */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div className="orders-pagination-right">
               <button
                 type="button"
-                className="btn btn-outline"
-                style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                className="orders-page-nav"
                 disabled={page <= 1 || loading}
                 onClick={() => handlePageChange(page - 1)}
               >
-                <ChevronLeft size={14} /> Previous
+                <ChevronLeft size={14} /> Prev
               </button>
 
               {getPageNumbers().map((p, idx) => (
                 p === '...' ? (
-                  <span key={`dots-${idx}`} style={{ padding: '0 6px', color: '#94a3b8' }}>...</span>
+                  <span key={`dots-${idx}`} className="orders-page-dots">…</span>
                 ) : (
                   <button
                     key={p}
                     type="button"
                     onClick={() => handlePageChange(p)}
                     disabled={loading}
-                    style={{
-                      minWidth: 32,
-                      height: 32,
-                      padding: '0 8px',
-                      borderRadius: 6,
-                      fontSize: 12.5,
-                      fontWeight: p === page ? 750 : 500,
-                      border: p === page ? '1.5px solid var(--primary, #f97316)' : '1px solid #cbd5e1',
-                      background: p === page ? 'var(--primary, #f97316)' : '#ffffff',
-                      color: p === page ? '#ffffff' : '#334155',
-                      cursor: p === page ? 'default' : 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
+                    className={`orders-page-btn ${p === page ? 'is-active' : ''}`}
                   >
                     {p}
                   </button>
@@ -731,8 +718,7 @@ export default function Orders() {
 
               <button
                 type="button"
-                className="btn btn-outline"
-                style={{ padding: '5px 12px', fontSize: 12.5, height: 32, display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                className="orders-page-nav"
                 disabled={page >= totalPages || loading}
                 onClick={() => handlePageChange(page + 1)}
               >

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
 
 :root {
   --primary: #f97316;
@@ -58,7 +58,7 @@
 }
 
 body {
-  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-app);
   color: var(--text-main);
   min-height: 100vh;
@@ -658,6 +658,11 @@ a.stat-card:hover .stat-open-icon {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.6px;
+  transition: background-color 0.15s ease;
+}
+
+.data-table th:hover {
+  background-color: #f1f5f9;
 }
 
 .data-table td {
@@ -665,6 +670,7 @@ a.stat-card:hover .stat-open-icon {
   border-bottom: 1px solid var(--border);
   color: var(--text-main);
   vertical-align: middle;
+  transition: background-color 0.15s ease-in-out;
 }
 
 .data-table tr:last-child td {
@@ -672,11 +678,30 @@ a.stat-card:hover .stat-open-icon {
 }
 
 .data-table tbody tr {
-  transition: background-color 0.15s ease;
+  transition: background-color 0.15s ease-in-out;
 }
 
 .data-table tbody tr:hover {
-  background-color: #fcfdfe;
+  background-color: #f1f5f9;
+}
+
+.data-table tbody tr:hover td {
+  background-color: #f1f5f9;
+}
+
+/* Global Spin Animations for Refresh and Loading Indicators */
+.spin,
+.svc-spin {
+  animation: globalSpinAnim 0.8s linear infinite;
+}
+
+@keyframes globalSpinAnim {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Badges */

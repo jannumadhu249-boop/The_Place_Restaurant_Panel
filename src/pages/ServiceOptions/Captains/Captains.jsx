@@ -420,19 +420,40 @@ export default function Captains() {
       </div>
 
       {/* ── Stats ─────────────────────────────────────────── */}
-      <div className="stats-grid" style={{ marginBottom: 22 }}>
+      <div className="svc-stats-grid">
         {[
-          { label: 'Total Staff', value: stats.total, bg: '#eff6ff', color: '#3b82f6', Icon: Users },
-          { label: 'Active on Floor', value: stats.active, bg: '#ecfdf5', color: '#10b981', Icon: CheckCircle2 },
-          { label: 'Off Duty', value: stats.offDuty, bg: '#f8fafc', color: '#64748b', Icon: Clock },
-        ].map(({ label, value, bg, color, Icon }) => (
-          <div key={label} className="stat-card">
-            <div className="stat-icon" style={{ background: bg, color }}><Icon size={20} /></div>
-            <div>
-              <div className="stat-label">{label}</div>
-              <div className="stat-value">{value}</div>
+          {
+            label: 'Total Staff',
+            value: stats.total,
+            hint: 'On the roster',
+            icon: <Users size={18} />,
+            tone: 'blue',
+          },
+          {
+            label: 'Active on Floor',
+            value: stats.active,
+            hint: 'Currently serving',
+            icon: <CheckCircle2 size={18} />,
+            tone: 'green',
+          },
+          {
+            label: 'Off Duty',
+            value: stats.offDuty,
+            hint: 'Not on shift',
+            icon: <Clock size={18} />,
+            tone: 'slate',
+          },
+        ].map(({ label, value, hint, icon, tone }) => (
+          <article className="svc-stat-card" data-tone={tone} key={label}>
+            <div className="svc-stat-top">
+              <span className="svc-stat-icon">{icon}</span>
+              <span className="svc-stat-hint">{hint}</span>
             </div>
-          </div>
+            <div className="svc-stat-body">
+              <div className="svc-stat-value">{value}</div>
+              <div className="svc-stat-label">{label}</div>
+            </div>
+          </article>
         ))}
       </div>
 

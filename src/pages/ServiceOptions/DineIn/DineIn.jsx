@@ -1071,23 +1071,40 @@ function DineIn() {
         </div>
       </div>
 
-      {/* Enable / Toggle Row */}
-      <div className="svc-toggle-row">
-        <div className="svc-toggle-meta">
-          <div className="svc-toggle-title">Dine-in service status</div>
-          <div className="svc-toggle-desc">
-            When off, guests cannot be seated and walk-in/reservation intake is paused.
+      {/* Dine-in service status banner */}
+      <div className={`dinein-status-banner ${enabled ? 'is-on' : 'is-off'}`}>
+        <span className="dinein-status-icon">
+          <Utensils size={20} />
+        </span>
+
+        <div className="dinein-status-copy">
+          <div className="dinein-status-head">
+            <h2 className="dinein-status-title">Dine-in Service</h2>
+            <span className={`dinein-status-pill ${enabled ? 'on' : 'off'}`}>
+              <span className="dinein-status-dot" />
+              {enabled ? 'Accepting guests' : 'Paused'}
+            </span>
           </div>
+          <p className="dinein-status-desc">
+            {enabled
+              ? 'Guests can be seated, reservations accepted and floor orders taken across every section.'
+              : 'Seating, reservations and walk-in intake are paused until the service is switched back on.'}
+          </p>
         </div>
-        <button
-          type="button"
-          className={`svc-switch ${enabled ? 'on' : ''}`}
-          aria-pressed={enabled}
-          onClick={handleToggleService}
-          title={enabled ? 'Dine-in Enabled' : 'Dine-in Disabled'}
-        >
-          <span className="svc-switch-knob" />
-        </button>
+
+        <div className="dinein-status-action">
+          <span className="dinein-status-action-label">{enabled ? 'Enabled' : 'Disabled'}</span>
+          <button
+            type="button"
+            className={`dinein-switch ${enabled ? 'on' : ''}`}
+            aria-pressed={enabled}
+            aria-label="Toggle dine-in service"
+            onClick={handleToggleService}
+            title={enabled ? 'Dine-in enabled — click to pause' : 'Dine-in disabled — click to enable'}
+          >
+            <span className="dinein-switch-knob" />
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards — fetch their own dashboard data */}
@@ -1426,6 +1443,7 @@ function DineIn() {
         settledSessionIds={settledSessionIds}
         settledInvoices={settledInvoices}
         onSessionSummary={handleSessionSummary}
+        onRefresh={() => fetchSessions(sessionPage, SESSION_PAGE_SIZE)}
         money={money}
       />
 

@@ -55,70 +55,71 @@ export default function DineInStatsCards({
   }, [refreshKey]);
 
   const d = dashboard || {};
+  const totalTables = Number(d.totalTables ?? 0);
 
   const cards = [
     {
       label: 'Active Sessions',
       value: Number(d.activeSessions ?? 0),
-      icon: <Utensils size={20} />,
-      iconBg: '#fff7ed',
-      iconColor: '#ea580c',
+      hint: 'Currently seated',
+      icon: <Utensils size={18} />,
+      tone: 'orange',
     },
     {
       label: 'Available Tables',
       value: Number(d.availableTables ?? 0),
-      icon: <Armchair size={20} />,
-      iconBg: '#ecfdf5',
-      iconColor: '#059669',
+      hint: totalTables > 0 ? `of ${totalTables} tables` : 'Ready to seat',
+      icon: <Armchair size={18} />,
+      tone: 'green',
     },
     {
       label: 'Reserved',
       value: Number(d.reservedTables ?? d.reserved ?? 0),
-      icon: <Clock3 size={20} />,
-      iconBg: '#eff6ff',
-      iconColor: '#2563eb',
+      hint: 'Upcoming holds',
+      icon: <Clock3 size={18} />,
+      tone: 'blue',
     },
     {
       label: 'Open Checks',
       value: money(d.openChecksAmount ?? 0),
-      icon: <IndianRupee size={20} />,
-      iconBg: '#fef3c7',
-      iconColor: '#d97706',
+      hint: 'Unbilled amount',
+      icon: <IndianRupee size={18} />,
+      tone: 'amber',
     },
   ];
 
   if (loading && !dashboard) {
     // Skeleton shimmer while the dashboard payload loads for the first time
     return (
-      <div className="stats-grid" style={{ marginBottom: 22 }}>
+      <div className="dinein-stats-grid">
         {cards.map((card) => (
-          <div
-            key={card.label}
-            style={{
-              background: '#f8fafc',
-              border: '1px solid #e2e8f0',
-              borderRadius: 14,
-              height: 86,
-              animation: 'pulse 1.5s ease-in-out infinite',
-            }}
-          />
+          <div className="dinein-stat-card is-skeleton" key={card.label}>
+            <div className="dinein-stat-top">
+              <span className="dinein-stat-icon-sk" />
+            </div>
+            <div className="dinein-stat-body">
+              <span className="dinein-stat-line lg" />
+              <span className="dinein-stat-line sm" />
+            </div>
+          </div>
         ))}
       </div>
     );
   }
 
   return (
-    <div className="stats-grid" style={{ marginBottom: 22 }}>
+    <div className="dinein-stats-grid">
       {cards.map((card) => (
-        <div className="stat-card" key={card.label}>
-          <div className="stat-icon" style={{ background: card.iconBg, color: card.iconColor }}>
-            {card.icon}
+        <article className="dinein-stat-card" data-tone={card.tone} key={card.label}>
+          <div className="dinein-stat-top">
+            <span className="dinein-stat-icon">{card.icon}</span>
+            <span className="dinein-stat-hint">{card.hint}</span>
           </div>
-          <div>
-            <div className="stat-label">{card.label}</div>
-            <div className="stat-value">{card.value}</div>
+          <div className="dinein-stat-body">
+            <div className="dinein-stat-value">{card.value}</div>
+            <div className="dinein-stat-label">{card.label}</div>
           </div>
-        </div>
+        </article>
       ))}
     </div>
   );

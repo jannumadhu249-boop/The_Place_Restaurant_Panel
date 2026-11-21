@@ -3,6 +3,7 @@ import {
   Clock3,
   CheckCircle2,
   Package,
+  ShoppingBag,
   Plus,
   Search,
   RefreshCw,
@@ -493,23 +494,36 @@ export default function Takeaway() {
         </div>
       </div>
 
-      {/* Enable / Toggle Banner */}
-      <div className="svc-toggle-row">
-        <div className="svc-toggle-meta">
-          <div className="svc-toggle-title">Takeaway / pickup service</div>
-          <div className="svc-toggle-desc">
-            When off, customers cannot place new pickup orders. Existing queue can still be fulfilled.
+      {/* Service status banner */}
+      <div className={`svc-service-banner ${enabled ? 'is-on' : 'is-off'}`}>
+        <span className="svc-service-icon"><ShoppingBag size={20} /></span>
+        <div className="svc-service-copy">
+          <div className="svc-service-head">
+            <h2 className="svc-service-title">Takeaway / pickup service</h2>
+            <span className={`svc-service-pill ${enabled ? 'on' : 'off'}`}>
+              <span className="svc-service-dot" />
+              {enabled ? 'Open for orders' : 'Paused'}
+            </span>
           </div>
+          <p className="svc-service-desc">
+            {enabled
+              ? 'Customers can place pickup orders and the kitchen queue keeps moving below.'
+              : 'New pickup orders are blocked until the service is switched back on. The existing queue can still be fulfilled.'}
+          </p>
         </div>
-        <button
-          type="button"
-          className={`svc-switch ${enabled ? 'on' : ''}`}
-          aria-pressed={enabled}
-          onClick={handleToggleService}
-          title={enabled ? 'Takeaway Enabled' : 'Takeaway Disabled'}
-        >
-          <span className="svc-switch-knob" />
-        </button>
+        <div className="svc-service-action">
+          <span className="svc-service-action-label">{enabled ? 'Enabled' : 'Disabled'}</span>
+          <button
+            type="button"
+            className={`svc-service-switch ${enabled ? 'on' : ''}`}
+            aria-pressed={enabled}
+            aria-label="Toggle takeaway service"
+            onClick={handleToggleService}
+            title={enabled ? 'Takeaway enabled — click to pause' : 'Takeaway disabled — click to enable'}
+          >
+            <span className="svc-service-switch-knob" />
+          </button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -742,6 +756,10 @@ export default function Takeaway() {
       {/* Recent Completions — owns its own fetch, pagination and refresh */}
       <RecentCompletionsCard
         onViewBill={openBillModal}
+        onRefresh={() => {
+          fetchOrders(page, limit, statusFilter, search);
+          fetchDashboardStats();
+        }}
         refreshKey={historyRevision}
         money={money}
       />

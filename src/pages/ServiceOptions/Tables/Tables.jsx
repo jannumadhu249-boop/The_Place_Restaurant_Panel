@@ -460,43 +460,48 @@ export default function Tables() {
       </div>
 
       {/* Stats Cards */}
-      <div className="stats-grid" style={{ marginBottom: 22 }}>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#f8fafc', color: '#0f172a' }}>
-            <Armchair size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Total Tables</div>
-            <div className="stat-value">{stats.total}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
-            <Armchair size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Available</div>
-            <div className="stat-value">{stats.available}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fff7ed', color: '#f97316' }}>
-            <Armchair size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Occupied</div>
-            <div className="stat-value">{stats.occupied}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#eff6ff', color: '#3b82f6' }}>
-            <Armchair size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Reserved</div>
-            <div className="stat-value">{stats.reserved}</div>
-          </div>
-        </div>
+      <div className="svc-stats-grid">
+        {[
+          {
+            label: 'Total Tables',
+            value: stats.total,
+            hint: availableSections.length > 0 ? `${availableSections.length} sections` : 'All zones',
+            icon: <Armchair size={18} />,
+            tone: 'blue',
+          },
+          {
+            label: 'Available',
+            value: stats.available,
+            hint: 'Ready to seat',
+            icon: <CheckCircle2 size={18} />,
+            tone: 'green',
+          },
+          {
+            label: 'Occupied',
+            value: stats.occupied,
+            hint: 'Guests seated',
+            icon: <Users size={18} />,
+            tone: 'orange',
+          },
+          {
+            label: 'Reserved',
+            value: stats.reserved,
+            hint: 'Upcoming holds',
+            icon: <UserCheck size={18} />,
+            tone: 'violet',
+          },
+        ].map(({ label, value, hint, icon, tone }) => (
+          <article className="svc-stat-card" data-tone={tone} key={label}>
+            <div className="svc-stat-top">
+              <span className="svc-stat-icon">{icon}</span>
+              <span className="svc-stat-hint">{hint}</span>
+            </div>
+            <div className="svc-stat-body">
+              <div className="svc-stat-value">{value}</div>
+              <div className="svc-stat-label">{label}</div>
+            </div>
+          </article>
+        ))}
       </div>
 
       {/* Search, Filters & View Toggle */}

@@ -1,6 +1,18 @@
 import React, { useMemo, useState } from 'react';
-import { Pizza, Download, RefreshCw, Search, Filter } from 'lucide-react';
+import {
+  Pizza,
+  Download,
+  RefreshCw,
+  Search,
+  Filter,
+  Utensils,
+  ShoppingBag,
+  IndianRupee,
+  Trophy,
+} from 'lucide-react';
 import './Reports.css';
+import ReportStatsCards from './ReportStatsCards';
+import ReportPagination from './ReportPagination';
 
 const SAMPLE_FOODS = [
   { id: 'F-101', name: 'Butter Chicken Special', category: 'Main Course', sold: 248, revenue: 4213.5, avgRating: 4.8, stock: 'In Stock' },
@@ -17,6 +29,8 @@ export default function FoodReport() {
   const [stock, setStock] = useState('All');
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState('sold');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const categories = useMemo(
     () => ['All', ...Array.from(new Set(SAMPLE_FOODS.map((f) => f.category)))],
@@ -56,6 +70,11 @@ export default function FoodReport() {
     );
   }, [filtered]);
 
+  // Client-side pagination — clamps to the real page count when filters shrink the list
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   const stockBadge = (s) => {
     if (s === 'In Stock') return 'badge-success';
     if (s === 'Low Stock') return 'badge-warning';
@@ -81,32 +100,24 @@ export default function FoodReport() {
         </div>
       </div>
 
-      <div className="report-summary">
-        <div className="report-summary-card">
-          <div className="report-summary-label">Menu Items</div>
-          <div className="report-summary-value">{totals.items}</div>
-          <div className="report-summary-hint">In current filter</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Units Sold</div>
-          <div className="report-summary-value">{totals.sold.toLocaleString()}</div>
-          <div className="report-summary-hint">Across selected items</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Food Revenue</div>
-          <div className="report-summary-value">₹ {totals.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-          <div className="report-summary-hint">Gross item sales</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Top Seller</div>
-          <div className="report-summary-value" style={{ fontSize: 16 }}>
-            {filtered[0]?.name || '—'}
-          </div>
-          <div className="report-summary-hint">
-            {filtered[0] ? `${filtered[0].sold} sold` : 'No items'}
-          </div>
-        </div>
-      </div>
+      <ReportStatsCards
+        cards={[
+          { label: 'Menu Items', value: totals.items, hint: 'In current filter', icon: <Utensils size={18} />, tone: 'blue' },
+          { label: 'Units Sold', value: totals.sold.toLocaleString(), hint: 'Across selected items', icon: <ShoppingBag size={18} />, tone: 'green' },
+          { label: 'Food Revenue', value: `₹ ${totals.revenue.toLocaleString('en-US', { minimumFractionDigits: 2 })}`, hint: 'Gross item sales', icon: <IndianRupee size={18} />, tone: 'amber' },
+          {
+            label: 'Top Seller',
+            value: (
+              <span className="report-stat-text" title={filtered[0]?.name || ''}>
+                {filtered[0]?.name || '—'}
+              </span>
+            ),
+            hint: filtered[0] ? `${filtered[0].sold} sold` : 'No items',
+            icon: <Trophy size={18} />,
+            tone: 'violet',
+          },
+        ]}
+      />
 
       <div className="card">
         <div className="card-header">
@@ -119,7 +130,7 @@ export default function FoodReport() {
         <div className="report-filters">
           <div className="form-group">
             <label className="form-label">Category</label>
-            <select className="form-select" value={category} onChange={(e) => setCategory(e.target.value)}>
+            <select className="form-select" value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }}>
               {categories.map((c) => (
                 <option key={c}>{c}</option>
               ))}
@@ -127,7 +138,7 @@ export default function FoodReport() {
           </div>
           <div className="form-group">
             <label className="form-label">Stock Status</label>
-            <select className="form-select" value={stock} onChange={(e) => setStock(e.target.value)}>
+            <select className="form-select" value={stock} onChange={(e) => { setStock(e.target.value); setPage(1); }}>
               <option>All</option>
               <option>In Stock</option>
               <option>Low Stock</option>
@@ -136,7 +147,7 @@ export default function FoodReport() {
           </div>
           <div className="form-group">
             <label className="form-label">Sort By</label>
-            <select className="form-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
+            <select className="form-select" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setPage(1); }}>
               <option value="sold">Units Sold</option>
               <option value="revenue">Revenue</option>
               <option value="rating">Rating</option>
@@ -152,7 +163,7 @@ export default function FoodReport() {
                 style={{ paddingLeft: 36 }}
                 placeholder="Food name or ID…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
           </div>
@@ -180,7 +191,7 @@ export default function FoodReport() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((f) => (
+                pagedRows.map((f) => (
                   <tr key={f.id}>
                     <td><strong>{f.id}</strong></td>
                     <td>{f.name}</td>
@@ -195,6 +206,17 @@ export default function FoodReport() {
             </tbody>
           </table>
         </div>
+
+        <ReportPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );

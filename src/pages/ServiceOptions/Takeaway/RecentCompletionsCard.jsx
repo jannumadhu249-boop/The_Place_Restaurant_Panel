@@ -53,6 +53,7 @@ const pagerBtn = {
 
 export default function RecentCompletionsCard({
   onViewBill,
+  onRefresh,
   refreshKey = 0,
   pageSize = 10,
   money = defaultMoney,
@@ -80,9 +81,11 @@ export default function RecentCompletionsCard({
           page: targetPage,
           limit: pageSize,
           status: 'picked_up',
+          _t: Date.now(),
         });
         const res = await fetch(`${URLS.GetTakeaway}?${params.toString()}`, {
           headers: getAuthHeaders(),
+          cache: 'no-store',
         });
         if (!res.ok) throw new Error(`Request failed (${res.status})`);
         const result = await res.json();
@@ -143,6 +146,11 @@ export default function RecentCompletionsCard({
     setPage(newPage);
   };
 
+  const handleRefresh = async () => {
+    await fetchCompletions(page);
+    if (onRefresh) onRefresh();
+  };
+
   const startItem = totalOrders === 0 ? 0 : (page - 1) * pageSize + 1;
   const endItem = Math.min(page * pageSize, totalOrders);
 
@@ -166,11 +174,13 @@ export default function RecentCompletionsCard({
         <button
           type="button"
           className="btn btn-outline"
-          style={{ padding: '6px 12px', fontSize: 12 }}
-          onClick={() => fetchCompletions(page)}
+          style={{ padding: '6px 12px', fontSize: 12, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          onClick={handleRefresh}
           disabled={isLoading}
+          title="Refresh recent completions"
         >
-          <RefreshCw size={13} className={isLoading ? 'spin' : undefined} /> Refresh
+          <RefreshCw size={13} className={isLoading ? 'svc-spin' : ''} />
+          {isLoading ? 'Refreshing…' : 'Refresh'}
         </button>
       </div>
 

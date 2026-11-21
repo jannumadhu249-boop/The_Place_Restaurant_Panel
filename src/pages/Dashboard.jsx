@@ -138,19 +138,6 @@ export default function Dashboard() {
           </div>
           <ArrowUpRight size={16} className="stat-open-icon" />
         </Link>
-
-        {/* <div className="stat-card" style={{ borderLeft: '4px solid #e11d48' }}>
-          <div className="stat-icon" style={{ background: '#fff1f2', color: '#e11d48' }}>
-            <Star size={24} fill="#e11d48" />
-          </div>
-          <div>
-            <div className="stat-label">Top Rated Food</div>
-            <div className="stat-value" style={{ fontSize: 18 }}>{topRatedFood.name}</div>
-            <div style={{ fontSize: 11.5, color: '#be123c', marginTop: 4, fontWeight: 600 }}>
-              ★ {topRatedFood.rating.toFixed(1)} · {topRatedFood.orders} orders
-            </div>
-          </div>
-        </div> */}
       </div>
 
       {/* Two-Column Layout for Kitchen Queue & Channel Analytics */}
@@ -311,7 +298,7 @@ export default function Dashboard() {
                 <th>Dish Title</th>
                 <th>Category</th>
                 <th>Orders Count</th>
-                <th>Total Volume</th>
+                <th>Total Amount</th>
                 <th>Customer Satisfaction</th>
               </tr>
             </thead>
@@ -338,7 +325,7 @@ export default function Dashboard() {
                   <td><strong>{d.orders} orders</strong></td>
                   <td><strong style={{ color: 'var(--primary)' }}>{d.revenue}</strong></td>
                   <td>
-                    <span className="badge badge-success">★ {d.rate} positive</span>
+                    <span className="badge badge-success">{d.rate} positive</span>
                   </td>
                 </tr>
               ))}

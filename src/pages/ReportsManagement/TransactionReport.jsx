@@ -1,6 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { ArrowLeftRight, Download, RefreshCw, Search, Filter } from 'lucide-react';
+import {
+  ArrowLeftRight,
+  ArrowDownLeft,
+  ArrowDownRight,
+  Download,
+  RefreshCw,
+  Search,
+  Filter,
+  Wallet
+} from 'lucide-react';
 import './Reports.css';
+import ReportStatsCards from './ReportStatsCards';
+import ReportPagination from './ReportPagination';
 
 const SAMPLE_TXNS = [
   { id: 'TXN-9042', ref: 'ORD-8921', type: 'Credit', channel: 'Card', amount: 31.05, fee: 0.93, net: 30.12, date: '2026-10-22', status: 'Settled' },
@@ -18,6 +29,8 @@ export default function TransactionReport() {
   const [type, setType] = useState('All');
   const [status, setStatus] = useState('All');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
 
   const filtered = useMemo(() => {
     return SAMPLE_TXNS.filter((t) => {
@@ -42,6 +55,11 @@ export default function TransactionReport() {
     return { credits, debits, fees, net, count: filtered.length };
   }, [filtered]);
 
+  // Client-side pagination — clamps to the real page count when filters shrink the list
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pagedRows = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
   return (
     <div style={{ width: '100%' }}>
       <div className="page-header">
@@ -61,28 +79,14 @@ export default function TransactionReport() {
         </div>
       </div>
 
-      <div className="report-summary">
-        <div className="report-summary-card">
-          <div className="report-summary-label">Transactions</div>
-          <div className="report-summary-value">{totals.count}</div>
-          <div className="report-summary-hint">In selected range</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Credits In</div>
-          <div className="report-summary-value" style={{ color: 'var(--success)' }}>₹ {totals.credits.toFixed(2)}</div>
-          <div className="report-summary-hint">Order payments</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Debits Out</div>
-          <div className="report-summary-value" style={{ color: 'var(--danger)' }}>₹ {totals.debits.toFixed(2)}</div>
-          <div className="report-summary-hint">Payouts & refunds</div>
-        </div>
-        <div className="report-summary-card">
-          <div className="report-summary-label">Net Movement</div>
-          <div className="report-summary-value">₹ {totals.net.toFixed(2)}</div>
-          <div className="report-summary-hint">Fees: ₹ {totals.fees.toFixed(2)}</div>
-        </div>
-      </div>
+      <ReportStatsCards
+        cards={[
+          { label: 'Transactions', value: totals.count, hint: 'In selected range', icon: <ArrowLeftRight size={18} />, tone: 'blue' },
+          { label: 'Credits In', value: `₹ ${totals.credits.toFixed(2)}`, hint: 'Order payments', icon: <ArrowDownLeft size={18} />, tone: 'green' },
+          { label: 'Debits Out', value: `₹ ${totals.debits.toFixed(2)}`, hint: 'Payouts & refunds', icon: <ArrowDownRight size={18} />, tone: 'red' },
+          { label: 'Net Movement', value: `₹ ${totals.net.toFixed(2)}`, hint: `Fees: ₹ ${totals.fees.toFixed(2)}`, icon: <Wallet size={18} />, tone: 'violet' },
+        ]}
+      />
 
       <div className="card">
         <div className="card-header">
@@ -95,15 +99,15 @@ export default function TransactionReport() {
         <div className="report-filters">
           <div className="form-group">
             <label className="form-label">From Date</label>
-            <input type="date" className="form-input" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+            <input type="date" className="form-input" value={fromDate} onChange={(e) => { setFromDate(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
             <label className="form-label">To Date</label>
-            <input type="date" className="form-input" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+            <input type="date" className="form-input" value={toDate} onChange={(e) => { setToDate(e.target.value); setPage(1); }} />
           </div>
           <div className="form-group">
             <label className="form-label">Type</label>
-            <select className="form-select" value={type} onChange={(e) => setType(e.target.value)}>
+            <select className="form-select" value={type} onChange={(e) => { setType(e.target.value); setPage(1); }}>
               <option>All</option>
               <option>Credit</option>
               <option>Debit</option>
@@ -111,7 +115,7 @@ export default function TransactionReport() {
           </div>
           <div className="form-group">
             <label className="form-label">Status</label>
-            <select className="form-select" value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select className="form-select" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
               <option>All</option>
               <option>Settled</option>
               <option>Pending</option>
@@ -126,7 +130,7 @@ export default function TransactionReport() {
                 style={{ paddingLeft: 36 }}
                 placeholder="Txn ID, ref, channel…"
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               />
             </div>
           </div>
@@ -156,7 +160,7 @@ export default function TransactionReport() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((t) => (
+                pagedRows.map((t) => (
                   <tr key={t.id}>
                     <td><strong>{t.id}</strong></td>
                     <td>{t.ref}</td>
@@ -185,6 +189,17 @@ export default function TransactionReport() {
             </tbody>
           </table>
         </div>
+
+        <ReportPagination
+          page={currentPage}
+          pageSize={pageSize}
+          totalItems={filtered.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
+        />
       </div>
     </div>
   );

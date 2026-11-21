@@ -359,43 +359,48 @@ export default function FloorSections() {
       </div>
 
       {/* ── Stats Cards ───────────────────────────────────── */}
-      <div className="stats-grid" style={{ marginBottom: 22 }}>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#eff6ff', color: '#3b82f6' }}>
-            <LayoutGrid size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Total Sections</div>
-            <div className="stat-value">{stats.total}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#ecfdf5', color: '#10b981' }}>
-            <CheckCircle2 size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Active Sections</div>
-            <div className="stat-value">{stats.active}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fff7ed', color: '#f97316' }}>
-            <Users size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Total Capacity</div>
-            <div className="stat-value">{stats.totalCapacity}</div>
-          </div>
-        </div>
-        <div className="stat-card">
-          <div className="stat-icon" style={{ background: '#fdf4ff', color: '#8b5cf6' }}>
-            <Armchair size={20} />
-          </div>
-          <div>
-            <div className="stat-label">Active Tables</div>
-            <div className="stat-value">{stats.totalTables}</div>
-          </div>
-        </div>
+      <div className="svc-stats-grid">
+        {[
+          {
+            label: 'Total Sections',
+            value: stats.total,
+            hint: `${stats.active} active`,
+            icon: <LayoutGrid size={18} />,
+            tone: 'blue',
+          },
+          {
+            label: 'Active Sections',
+            value: stats.active,
+            hint: 'Serving guests',
+            icon: <CheckCircle2 size={18} />,
+            tone: 'green',
+          },
+          {
+            label: 'Total Capacity',
+            value: stats.totalCapacity,
+            hint: 'Max seats',
+            icon: <Users size={18} />,
+            tone: 'orange',
+          },
+          {
+            label: 'Active Tables',
+            value: stats.totalTables,
+            hint: 'Assigned tables',
+            icon: <Armchair size={18} />,
+            tone: 'violet',
+          },
+        ].map(({ label, value, hint, icon, tone }) => (
+          <article className="svc-stat-card" data-tone={tone} key={label}>
+            <div className="svc-stat-top">
+              <span className="svc-stat-icon">{icon}</span>
+              <span className="svc-stat-hint">{hint}</span>
+            </div>
+            <div className="svc-stat-body">
+              <div className="svc-stat-value">{value}</div>
+              <div className="svc-stat-label">{label}</div>
+            </div>
+          </article>
+        ))}
       </div>
 
       {/* ── Search & Filter ────────────────────────────────── */}
